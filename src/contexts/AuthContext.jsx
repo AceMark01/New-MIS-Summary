@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { getDisplayableImageUrl } from '../utils/imageUtils';
 
 const AuthContext = createContext(undefined);
 
@@ -16,10 +17,8 @@ export function AuthProvider({ children }) {
     const storedUser = localStorage.getItem('mis_user');
     if (storedUser) {
       setUser(JSON.parse(storedUser));
-    } else {
-      // Pre-fetch users if not logged in
-      preloadUsers();
     }
+    preloadUsers();
     setLoading(false);
   }, []);
 
@@ -32,6 +31,25 @@ export function AuthProvider({ children }) {
         if (result.success && Array.isArray(result.data)) {
           setUserCache(result.data);
           console.log("Users pre-loaded for fast login");
+
+          // Dynamic sync: Update current user's image from Master sheet based on name match (Column A)
+          setUser(prevUser => {
+            if (!prevUser) return prevUser;
+
+            const userRow = result.data.find(row =>
+              row[0] && String(row[0]).trim().toLowerCase() === String(prevUser.name).trim().toLowerCase()
+            );
+
+            if (userRow && userRow[4]) {
+              const freshImage = getDisplayableImageUrl(userRow[4]);
+              if (freshImage !== prevUser.image) {
+                const updated = { ...prevUser, image: freshImage };
+                localStorage.setItem('mis_user', JSON.stringify(updated));
+                return updated;
+              }
+            }
+            return prevUser;
+          });
         }
       }
     } catch (err) {
@@ -81,7 +99,7 @@ export function AuthProvider({ children }) {
             id: userRow[5],
             name: userRow[0],
             role: role,
-            image: userRow[4] || 'https://images.pexels.com/photos/614810/pexels-photo-614810.jpeg?auto=compress&cs=tinysrgb&w=600',
+            image: getDisplayableImageUrl(userRow[4]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(userRow[0])}&background=0D8ABC&color=fff`,
             email: userRow[1],
             department: userRow[2],
             designation: userRow[3]

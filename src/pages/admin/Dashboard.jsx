@@ -1,15 +1,7 @@
 // ============ DASHBOARD PAGE ============
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import {
-  Download,
-  Users,
-  CheckSquare,
-  Clock,
-  Target,
-  ChevronDown,
-  X,
-  Filter,
-} from "lucide-react";
+import { LayoutDashboard, Users, Calendar, Clock, AlertTriangle, Search, ChevronDown, Download, Filter, MessageSquare, Briefcase, TrendingUp, X, MapPin, Phone, Mail, User, Info } from 'lucide-react';
+import { getDisplayableImageUrl } from '../../utils/imageUtils';
 import {
   employees,
   getTopScorers,
@@ -39,49 +31,6 @@ const getCurrentWeek = () => {
   };
 };
 
-const getDisplayableImageUrl = (url) => {
-  if (!url) return null;
-  if (typeof url !== 'string') return url;
-
-  const trimmedUrl = url.trim();
-
-  try {
-    // 1. If it's a direct Drive ID (28-35 chars, no slashes/dots)
-    if (/^[a-zA-Z0-9_-]{28,35}$/.test(trimmedUrl)) {
-      return `https://drive.google.com/thumbnail?id=${trimmedUrl}&sz=w150`;
-    }
-
-    // 2. Extract ID from various Google Drive URL formats
-    let driveId = null;
-    const ucExportMatch = trimmedUrl.match(/[?&]id=([a-zA-Z0-9_-]+)/);
-    const directMatch = trimmedUrl.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
-    const openMatch = trimmedUrl.match(/open\?id=([a-zA-Z0-9_-]+)/);
-
-    if (directMatch) driveId = directMatch[1];
-    else if (openMatch) driveId = openMatch[1];
-    else if (ucExportMatch && (trimmedUrl.includes("drive.google.com") || trimmedUrl.includes("docs.google.com"))) {
-      driveId = ucExportMatch[1];
-    }
-
-    if (driveId) {
-      return `https://drive.google.com/thumbnail?id=${driveId}&sz=w150`;
-    }
-
-    // 3. Fallback for Google Drive links that don't match strict patterns but contain an ID
-    if (trimmedUrl.includes("drive.google.com") || trimmedUrl.includes("docs.google.com")) {
-      const anyIdMatch = trimmedUrl.match(/([a-zA-Z0-9_-]{25,})/);
-      if (anyIdMatch && anyIdMatch[1]) {
-        return `https://drive.google.com/thumbnail?id=${anyIdMatch[1]}&sz=w150`;
-      }
-    }
-
-    // 4. If it's already a thumbnail or a direct image link, return as is
-    return trimmedUrl;
-  } catch (e) {
-    console.error("Error processing image URL:", url, e);
-    return trimmedUrl;
-  }
-};
 
 const DateAssignmentToolbar = ({
   assignmentType,
