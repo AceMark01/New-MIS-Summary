@@ -2,6 +2,15 @@ import React from 'react';
 
 const HalfCircleChart = ({ data, labels, colors }) => {
   const total = data.reduce((sum, value) => sum + value, 0);
+
+  if (total === 0) {
+    return (
+      <div className="w-full h-full flex items-center justify-center text-gray-400 italic text-sm">
+        No data available
+      </div>
+    );
+  }
+
   let currentAngle = -180;
 
   return (
@@ -46,7 +55,7 @@ const HalfCircleChart = ({ data, labels, colors }) => {
             );
           })}
         </svg>
-        
+
         {/* Center Text */}
         <div className="absolute bottom-2 left-1/2 transform -translate-x-1/2 text-center">
           <div className="text-xs md:text-sm font-semibold text-gray-700">Top 5</div>

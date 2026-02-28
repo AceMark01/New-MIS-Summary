@@ -1,6 +1,6 @@
 // ============ DASHBOARD PAGE ============
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { LayoutDashboard, Users, Calendar, Clock, AlertTriangle, Search, ChevronDown, Download, Filter, MessageSquare, Briefcase, TrendingUp, X, MapPin, Phone, Mail, User, Info } from 'lucide-react';
+import { LayoutDashboard, Users, Calendar, Clock, AlertTriangle, Search, ChevronDown, Download, Filter, MessageSquare, Briefcase, TrendingUp, X, MapPin, Phone, Mail, User, Info, Loader2 } from 'lucide-react';
 import { getDisplayableImageUrl } from '../../utils/imageUtils';
 import {
   employees,
@@ -14,7 +14,12 @@ import EmployeesTable from "../../components/tables/EmployeesTable";
 import HalfCircleChart from "../../components/charts/HalfCircleChart";
 import HorizontalBarChart from "../../components/charts/HorizontalBarChart";
 import VerticalBarChart from "../../components/charts/VerticalBarChart";
-import { generateDashboardPDF } from "../../utils/pdfGenerator";
+import DashboardHeader from "./components/DashboardHeader";
+import EmployeeListSection from "./components/EmployeeListSection";
+import UserDetailsModal from "./components/UserDetailsModal";
+import ChartsGrid from "./components/ChartsGrid";
+import DepartmentScoreChart from "../../components/charts/DepartmentScoreChart";
+import { useAuth } from "../../contexts/AuthContext";
 
 const getCurrentWeek = () => {
   const today = new Date();
@@ -32,56 +37,10 @@ const getCurrentWeek = () => {
 };
 
 
-const DateAssignmentToolbar = ({
-  assignmentType,
-  handleTypeChange,
-  assignmentStartDate,
-  handleStartDateChange,
-  assignmentEndDate,
-  handleEndDateChange
-}) => (
-  <div className="hidden md:flex items-end gap-3 mr-3 pb-0.5">
-    {!assignmentType && (
-      <span className="text-sm text-red-500 font-medium animate-pulse mb-2.5">
-        Select type
-      </span>
-    )}
-
-    <div>
-      <select
-        value={assignmentType}
-        onChange={handleTypeChange}
-        className="block h-[38px] pl-3 pr-8 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 hover:bg-gray-50"
-      >
-        <option value="" disabled>Type</option>
-        <option value="Weekly">Weekly</option>
-        <option value="Monthly">Monthly</option>
-      </select>
-    </div>
-
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-medium text-gray-500 leading-none ml-1">Start Date</label>
-      <input
-        type="date"
-        value={assignmentStartDate}
-        onChange={handleStartDateChange}
-        className="block h-[38px] w-36 px-3 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 hover:bg-gray-50"
-      />
-    </div>
-
-    <div className="flex flex-col gap-1">
-      <label className="text-[11px] font-medium text-gray-500 leading-none ml-1">End Date</label>
-      <input
-        type="date"
-        value={assignmentEndDate}
-        onChange={handleEndDateChange}
-        className="block h-[38px] w-36 px-3 text-sm bg-white border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 hover:bg-gray-50"
-      />
-    </div>
-  </div>
-);
+// DateAssignmentToolbar removed as dates are now extracted from sheet data during submission.
 
 const AdminDashboard = () => {
+  const { user } = useAuth();
   const [selectedEmployees, setSelectedEmployees] = useState([]);
   // Dashboard Logic
   const [dateRange, setDateRange] = useState(getCurrentWeek());
@@ -89,6 +48,8 @@ const AdminDashboard = () => {
   // New State for Sheet Data
   const [loading, setLoading] = useState(true);
   const [sheetEmployees, setSheetEmployees] = useState([]);
+  const [departmentScores, setDepartmentScores] = useState([]);
+  const [dataSheetRows, setDataSheetRows] = useState([]);
 
   // Dynamic Column Labels
   const [columnLabels, setColumnLabels] = useState({
@@ -143,6 +104,7 @@ const AdminDashboard = () => {
     ALL_COLUMNS.forEach(col => newVisibility[col.key] = isChecked);
     setVisibleColumns(newVisibility);
   };
+
   const [selectAll, setSelectAll] = useState(false);
   const [employeeCommitments, setEmployeeCommitments] = useState({});
   const [expandedEmployee, setExpandedEmployee] = useState(null);
@@ -150,72 +112,35 @@ const AdminDashboard = () => {
   const [filterDepartment, setFilterDepartment] = useState("");
   const [filterHR, setFilterHR] = useState("");
   const [selectedUserDetails, setSelectedUserDetails] = useState(null);
-  const [activeDrillDown, setActiveDrillDown] = useState(null);
 
-  // Date Assignment State
-  const [assignmentType, setAssignmentType] = useState("");
-  const [assignmentStartDate, setAssignmentStartDate] = useState("");
-  const [assignmentEndDate, setAssignmentEndDate] = useState("");
-
-  const handleTypeChange = useCallback((e) => {
-    const type = e.target.value;
-    setAssignmentType(type);
-
-    // Recalculate end date if start date exists
-    if (assignmentStartDate) {
-      const start = new Date(assignmentStartDate);
-      if (type === "Weekly") {
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        setAssignmentEndDate(end.toISOString().split('T')[0]);
-      } else if (type === "Monthly") {
-        const end = new Date(start);
-        end.setDate(start.getDate() + 30);
-        setAssignmentEndDate(end.toISOString().split('T')[0]);
-      }
-    }
-  }, [assignmentStartDate]);
-
-  const handleStartDateChange = useCallback((e) => {
-    const date = e.target.value;
-    setAssignmentStartDate(date);
-
-    if (date && assignmentType) {
-      const start = new Date(date);
-      if (assignmentType === "Weekly") {
-        const end = new Date(start);
-        end.setDate(start.getDate() + 6);
-        setAssignmentEndDate(end.toISOString().split('T')[0]);
-      } else if (assignmentType === "Monthly") {
-        const end = new Date(start);
-        end.setDate(start.getDate() + 30);
-        setAssignmentEndDate(end.toISOString().split('T')[0]);
-      }
-    }
-  }, [assignmentType]);
-
-  const handleEndDateChange = useCallback((e) => {
-    setAssignmentEndDate(e.target.value);
-  }, []);
-
-  // Reset assignment state when no employees selected
+  // Lock body scroll when popup is open
   useEffect(() => {
-    if (selectedEmployees.length === 0) {
-      setAssignmentType("");
-      setAssignmentStartDate("");
-      setAssignmentEndDate("");
+    if (selectedUserDetails) {
+      document.body.style.overflow = 'hidden';
+    } else {
+      document.body.style.overflow = '';
     }
-  }, [selectedEmployees]);
+    return () => { document.body.style.overflow = ''; };
+  }, [selectedUserDetails]);
+  const [activeDrillDown, setActiveDrillDown] = useState(null);
+  const [drillDownLoading, setDrillDownLoading] = useState(false);
 
   // New State for Data Editing
   const [editableData, setEditableData] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [archivedMap, setArchivedMap] = useState({});
 
+  // Reset editable data when selection changes
+  useEffect(() => {
+    if (selectedEmployees.length === 0) {
+      setEditableData({});
+    }
+  }, [selectedEmployees]);
+
   // Handle Edit functionalities
   const handleInputChange = (employeeId, field, value) => {
-    // Number validation
-    if (value && !/^\d*$/.test(value)) return;
+    // Number validation (Skip for Commitment field which allows text)
+    if (field !== "nextWeekCommitment" && value && !/^\d*$/.test(value)) return;
 
     setEditableData(prev => ({
       ...prev,
@@ -231,15 +156,11 @@ const AdminDashboard = () => {
     const emp = sheetEmployees.find(e => e.id === employeeId);
     if (!emp) return;
 
-    // 🔹 SELECT
+    // SELECT
     if (!alreadySelected) {
       const existing = archivedMap[emp.name];
 
-      // ⭐ AUTO-POPULATE DATES + VALUES
       if (existing) {
-        setAssignmentStartDate(existing.start);
-        setAssignmentEndDate(existing.end);
-
         setEditableData(prev => ({
           ...prev,
           [employeeId]: existing.values
@@ -255,7 +176,7 @@ const AdminDashboard = () => {
         }));
       }
     }
-    // 🔹 UNSELECT
+    // UNSELECT
     else {
       setEditableData(prev => {
         const copy = { ...prev };
@@ -275,37 +196,61 @@ const AdminDashboard = () => {
         const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
         if (!scriptUrl) {
           console.error("VITE_APPS_SCRIPT_URL not set");
-          // Fallback to mock data if URL missing
           setSheetEmployees(employees);
           setLoading(false);
           return;
         }
 
         // Fetch sheets
-        const [recordsResponse, archivedResponse, masterResponse] = await Promise.all([
+        const [recordsResponse, archivedResponse, masterResponse, dataResponse, deptScoreResponse] = await Promise.all([
           fetch(`${scriptUrl}?sheet=For Records`),
           fetch(`${scriptUrl}?sheet=Archived`),
-          fetch(`${scriptUrl}?sheet=Master`)
+          fetch(`${scriptUrl}?sheet=Master`),
+          fetch(`${scriptUrl}?sheet=Data`),
+          fetch(`${scriptUrl}?sheet=Department Score Graph`)
         ]);
 
         const result = await recordsResponse.json();
         const archivedResult = await archivedResponse.json();
         const masterResult = await masterResponse.json();
+        const dataResult = await dataResponse.json();
+        const deptScoreResult = await deptScoreResponse.json();
 
-        // Build image map from Master sheet (Column A: Name, Column E: Image)
+        // Store Data sheet rows (skip header row)
+        if (dataResult.success && Array.isArray(dataResult.data)) {
+          setDataSheetRows(dataResult.data.slice(1));
+        }
+
+        // Store Department Scores
+        if (deptScoreResult.success && Array.isArray(deptScoreResult.data)) {
+          // Column A: Name (index 0), B: Work Not Done % (index 1), C: Not Done On Time % (index 2), D: Pending (index 3)
+          const parsedDeptScores = deptScoreResult.data.slice(1)
+            .filter(row => row[0]) // Filter out empty names
+            .map(row => ({
+              name: row[0],
+              workNotDonePct: parseFloat(row[1]) || 0,
+              notDoneOnTimePct: parseFloat(row[2]) || 0,
+              pendingWorks: parseInt(row[3]) || 0
+            }));
+          setDepartmentScores(parsedDeptScores);
+        }
+
+        // Build image and designation maps from Master sheet (Column A: Name, Column D: Designation, Column E: Image)
         const imageMap = {};
+        const designationMap = {};
         if (masterResult.success && Array.isArray(masterResult.data)) {
           masterResult.data.slice(1).forEach(row => {
             const name = row[0] ? String(row[0]).trim().toLowerCase() : "";
+            const designation = row[3] ? String(row[3]).trim() : "";
             const imageUrl = row[4];
-            if (name && imageUrl) {
-              imageMap[name] = imageUrl;
+            if (name) {
+              if (imageUrl) imageMap[name] = imageUrl;
+              if (designation) designationMap[name] = designation;
             }
           });
         }
 
         // Update Dynamic Headers from Archived Sheet
-        // Expected: D, E, F -> Indices 3, 4, 5
         if (archivedResult.success && archivedResult.data && archivedResult.data[0]) {
           const arcHeaders = archivedResult.data[0];
           setColumnLabels(prev => ({
@@ -316,11 +261,8 @@ const AdminDashboard = () => {
           }));
         }
 
-        // Process Archived Data to find latest entry per employee
-        // 🔹 Build archived map by NAME (latest entry wins)
+        // Build archived map by NAME (latest entry wins)
         const newArchivedMap = {};
-
-        // Calculate current week range to filter data
         const currentWeek = getCurrentWeek();
 
         if (archivedResult.data && Array.isArray(archivedResult.data)) {
@@ -331,19 +273,15 @@ const AdminDashboard = () => {
 
             if (!name) return;
 
-            // 🔹 FILTER: Only fetch data for the CURRENT WEEK
-            // Normalize dates to YYYY-MM-DD for comparison
             const normalizeDate = (d) => {
               if (!d) return "";
               const dateObj = new Date(d);
-              if (isNaN(dateObj)) return d; // Return original if parsing fails
+              if (isNaN(dateObj)) return d;
               return dateObj.toISOString().split("T")[0];
             };
 
             const normRowStart = normalizeDate(rowStart);
 
-            // Allow any entry that STARTS within the current week range
-            // This handles cases where assignment starts mid-week (e.g. Tuesday)
             if (normRowStart < currentWeek.start || normRowStart > currentWeek.end) {
               return;
             }
@@ -364,34 +302,29 @@ const AdminDashboard = () => {
         setArchivedMap(newArchivedMap);
 
         if (result.success && Array.isArray(result.data)) {
-          // Parse Sheet Data
           const headers = result.data[0];
 
-          // Update column labels from sheet headers if available
           if (headers) {
             setColumnLabels(prev => ({
               ...prev,
               name: headers[2] || prev.name,
               designation: headers[3] || prev.designation,
-              target: headers[4] || prev.target,
-              actualWork: headers[5] || prev.actualWork,
-              weeklyDone: headers[6] || prev.weeklyDone,
-              weeklyOnTime: headers[7] || prev.weeklyOnTime,
-              totalWork: headers[8] || prev.totalWork,
-              weekPending: headers[9] || prev.weekPending,
-              allPending: headers[10] || prev.allPending
+              target: headers[3] || prev.target,
+              actualWork: headers[4] || prev.actualWork,
+              weeklyDone: headers[5] || prev.weeklyDone,
+              weeklyOnTime: headers[6] || prev.weeklyOnTime,
+              totalWork: headers[7] || prev.totalWork,
+              weekPending: headers[8] || prev.weekPending,
+              allPending: headers[9] || prev.allPending
             }));
           }
 
-          // Sheet Headers: Date Start: 1, Date End: 2, Name: 3, Designation: 4, Target: 5, Actual Work Done: 6, % Work Not Done: 7, % Work Not Done On Time: 8, Total Work Done: 9, Week Pending: 10, All Pending: 11
-
-          const parsedData = result.data.slice(1)
-            .filter(row => row[2] && String(row[2]).trim() !== "") // Filter out rows where Name is empty
-            .map((row, index) => { // Slice 1 to skip header
+          const parsedData = result.data.slice(2)
+            .filter(row => row[2] && String(row[2]).trim() !== "")
+            .map((row, index) => {
               const randomId = `emp-${100 + index}`;
               const empName = row[2] || "Unknown";
               const normalizedName = String(empName).trim().toLowerCase();
-              // Use newArchivedMap here which contains the actual data
               const archivedData = newArchivedMap[empName] ? newArchivedMap[empName].values : {};
 
               const rawImageUrl = imageMap[normalizedName];
@@ -405,45 +338,50 @@ const AdminDashboard = () => {
               return {
                 id: randomId,
                 name: empName,
-                designation: row[3] || "",
-                department: "", // Dummy Department Removed
+                startDate: row[10] || "", // Column K (index 10)
+                endDate: row[11] || "",   // Column L (index 11)
+                designation: designationMap[normalizedName] || row[3] || "N/A",
+                department: "",
                 image: finalImageUrl,
 
-                // Mapped Fields
-                target: row[4] || 0,
-                actualWorkDone: row[5] || 0,
-                weeklyWorkDone: row[6] || "0%", // Showing negative % directly
-                weeklyWorkDoneOnTime: row[7] || "0%",
-                totalWorkDone: row[8] || 0,
-                weekPending: row[9] || 0,
-                allPendingTillDate: row[10] || 0,
+                target: row[3] || 0,
+                actualWorkDone: row[4] || 0,
+                weeklyWorkDone: row[5] || "0%",
+                weeklyWorkDoneOnTime: row[6] || "0%",
+                totalWorkDone: row[7] || 0,
+                weekPending: row[8] || 0,
+                allPendingTillDate: row[9] || 0,
 
-                // Removed Dummy Data for missing columns
-                plannedWorkNotDone: 0,
-                plannedWorkNotDoneOnTime: 0,
-                commitment: 0,
+                plannedWorkNotDone: row[12] || 0,
+                plannedWorkNotDoneOnTime: row[13] || 0,
+                commitment: row[14] || 0,
 
-                nextWeekPlannedWorkNotDone: archivedData.nextWeekPlannedNotDone || 0,
-                nextWeekPlannedWorkNotDoneOnTime: archivedData.nextWeekPlannedNotDoneOnTime || 0,
-                nextWeekCommitment: archivedData.nextWeekCommitment || 0
+                nextWeekPlannedWorkNotDone: row[16] || 0,
+                nextWeekPlannedWorkNotDoneOnTime: row[17] || 0,
+                nextWeekCommitment: row[18] || 0
               };
             });
 
-          setSheetEmployees(parsedData);
+          // Filter data if user is not an admin
+          const finalData = user && user.role === 'admin'
+            ? parsedData
+            : parsedData.filter(emp => emp.name.toLowerCase() === (user?.name || "").toLowerCase());
+
+          setSheetEmployees(finalData);
         } else {
           console.error("Failed to load sheet data", result);
-          setSheetEmployees(employees); // Fallback
+          setSheetEmployees(employees);
         }
       } catch (error) {
         console.error("Error fetching sheet data:", error);
-        setSheetEmployees(employees); // Fallback
+        setSheetEmployees(employees);
       } finally {
         setLoading(false);
       }
     };
 
     fetchData();
-  }, []); // Only fetch on mount
+  }, []);
 
   useEffect(() => {
     const saved = localStorage.getItem("employeeCommitments");
@@ -455,46 +393,158 @@ const AdminDashboard = () => {
   // Filter employees
   const filteredEmployees = useMemo(() => {
     return sheetEmployees.filter((emp) => {
-      const matchesName = emp.name
-        .toLowerCase()
-        .includes(filterName.toLowerCase());
-      const matchesDepartment =
-        filterDepartment === "" || emp.department === filterDepartment;
-      const matchesHR = filterHR === "" || emp.hrName === filterHR;
-      return matchesName && matchesDepartment && matchesHR;
+      const matchesName = emp.name.toLowerCase().includes(filterName.toLowerCase());
+      const matchesDesignation = filterDepartment === "" || emp.designation === filterDepartment;
+      return matchesName && matchesDesignation;
     });
-  }, [sheetEmployees, filterName, filterDepartment, filterHR]);
+  }, [sheetEmployees, filterName, filterDepartment]);
 
-  // Get unique departments and HR names
-  const uniqueDepartments = useMemo(() => [
-    ...new Set(sheetEmployees.map((emp) => emp.department)),
-  ], [sheetEmployees]);
-
-  const uniqueHRNames = useMemo(() => [
-    ...new Set(sheetEmployees.map((emp) => emp.hrName).filter(Boolean)),
+  // Get unique designations
+  const uniqueDesignations = useMemo(() => [
+    ...new Set(sheetEmployees.map((emp) => emp.designation).filter(Boolean)),
   ], [sheetEmployees]);
 
   // Statistics - Memoized
   const {
     topScorers,
+    topBestPerformers,
     lowestScorers,
-    employeesByPending,
     commitmentComparison
-  } = useMemo(() => ({
-    topScorers: getTopScorers(5),
-    lowestScorers: getLowestScorers(5),
-    employeesByPending: getEmployeesByPendingTasks(),
-    commitmentComparison: getWeeklyCommitmentComparison()
-  }), []); // Using empty deps as utils use internal mock data
+  } = useMemo(() => {
+    let topScorersList = [];
 
-  const topScorersData = useMemo(() => topScorers.map((emp) => emp.score), [topScorers]);
+    if (sheetEmployees.length > 0) {
+      const latestDateStr = sheetEmployees.reduce((latest, emp) => {
+        if (!emp.endDate) return latest;
+        const currentEnd = new Date(emp.endDate);
+        if (isNaN(currentEnd)) return latest;
+        if (!latest || currentEnd > new Date(latest)) return emp.endDate;
+        return latest;
+      }, "");
+
+      topScorersList = sheetEmployees
+        .filter(emp => emp.endDate === latestDateStr)
+        .map(emp => ({
+          name: emp.name,
+          workDone: parseFloat(emp.actualWorkDone) || 0,  // Column E (index 4)
+          totalTasks: parseFloat(emp.target) || 0,        // Column D (index 3)
+          donePct: parseFloat(String(emp.weeklyWorkDone || "0").replace('%', '').trim()) || 0, // Column F (index 5)
+          onTimePct: parseFloat(String(emp.weeklyWorkDoneOnTime || "0").replace('%', '').trim()) || 0, // Column G (index 6)
+          allPending: parseFloat(emp.allPendingTillDate) || 0 // Column J (index 9)
+        }))
+        .filter(emp => emp.totalTasks > 0) // Exclude if 0 tasks in Column D
+        .sort((a, b) => {
+          // 1. Primary: Lowest Weekly Done % (Column F)
+          if (a.donePct !== b.donePct) {
+            return a.donePct - b.donePct;
+          }
+          // 2. Secondary: Lowest actual task done (Column E)
+          if (a.workDone !== b.workDone) {
+            return a.workDone - b.workDone;
+          }
+          // 3. Tertiary (Tie on F & E): Lowest Weekly Done On Time % (Column G)
+          if (a.onTimePct !== b.onTimePct) {
+            return a.onTimePct - b.onTimePct;
+          }
+          // 4. Quaternary: Highest All Pending Till Date (Column J)
+          if (b.allPending !== a.allPending) {
+            return b.allPending - a.allPending; // Higher is worse
+          }
+          // 5. Quinary: Higher total tasks/target (Column D) makes it worse for the same low performance
+          return b.totalTasks - a.totalTasks;
+        })
+        .slice(0, 5);
+    }
+
+    // --- Top 5 Best Performers: most tasks done (Column E), sorted descending ---
+    let topBestList = [];
+    if (sheetEmployees.length > 0) {
+      const latestDateStr = sheetEmployees.reduce((latest, emp) => {
+        if (!emp.endDate) return latest;
+        const currentEnd = new Date(emp.endDate);
+        if (isNaN(currentEnd)) return latest;
+        if (!latest || currentEnd > new Date(latest)) return emp.endDate;
+        return latest;
+      }, "");
+
+      topBestList = sheetEmployees
+        .filter(emp => emp.endDate === latestDateStr)
+        .map(emp => ({
+          name: emp.name,
+          workDone: parseFloat(emp.actualWorkDone) || 0,  // Column E (index 4)
+          totalTasks: parseFloat(emp.target) || 0,        // Column D (index 3)
+          donePct: parseFloat(String(emp.weeklyWorkDone || "0").replace('%', '').trim()) || 0, // Column F (index 5)
+          onTimePct: parseFloat(String(emp.weeklyWorkDoneOnTime || "0").replace('%', '').trim()) || 0, // Column G (index 6)
+          allPending: parseFloat(emp.allPendingTillDate) || 0 // Column J (index 9)
+        }))
+        .sort((a, b) => {
+          // 1. Primary: Highest Weekly Done % (Column F)
+          if (b.donePct !== a.donePct) {
+            return b.donePct - a.donePct;
+          }
+          // 2. Secondary: Highest number of task done (Column E)
+          if (b.workDone !== a.workDone) {
+            return b.workDone - a.workDone;
+          }
+          // 3. Tertiary: Highest Weekly Done On Time % (Column G)
+          if (b.onTimePct !== a.onTimePct) {
+            return b.onTimePct - a.onTimePct;
+          }
+          // 4. Quaternary: Lowest All Pending Till Date (Column J)
+          if (a.allPending !== b.allPending) {
+            return a.allPending - b.allPending; // Lower is better
+          }
+          // 5. Quinary: Higher target (Column D)
+          return b.totalTasks - a.totalTasks;
+        })
+        .slice(0, 5);
+    }
+
+    return {
+      topScorers: topScorersList.length > 0 ? topScorersList : [],
+      topBestPerformers: topBestList.length > 0 ? topBestList : [],
+      lowestScorers: getLowestScorers(5),
+      commitmentComparison: getWeeklyCommitmentComparison()
+    };
+  }, [sheetEmployees, columnLabels]);
+
+  const topScorersData = useMemo(() => topScorers.map((emp) => {
+    const val = emp.donePct ?? emp.score ?? 0;
+    return isNaN(val) ? 0 : val;
+  }), [topScorers]);
   const topScorersLabels = useMemo(() => topScorers.map((emp) => emp.name), [topScorers]);
-  const lowestScorersData = useMemo(() => lowestScorers.map((emp) => emp.score), [lowestScorers]);
+  const topBestData = useMemo(() => topBestPerformers.map(emp => {
+    const val = emp.workDone ?? emp.score ?? 0;
+    return isNaN(val) ? 0 : val;
+  }), [topBestPerformers]);
+  const topBestLabels = useMemo(() => topBestPerformers.map(emp => emp.name), [topBestPerformers]);
+  const topBestTotalData = useMemo(() => topBestPerformers.map(emp => {
+    const val = emp.totalTasks ?? 0;
+    return isNaN(val) ? 0 : val;
+  }), [topBestPerformers]);
+  const lowestScorersData = useMemo(() => lowestScorers.map((emp) => isNaN(emp.score) ? 0 : (emp.score ?? 0)), [lowestScorers]);
   const lowestScorersLabels = useMemo(() => lowestScorers.map((emp) => emp.name), [lowestScorers]);
-  const pendingTasksData = useMemo(() => employeesByPending.map((emp) => emp.pendingTasks), [employeesByPending]);
-  const pendingTasksLabels = useMemo(() => employeesByPending.map((emp) => emp.name), [employeesByPending]);
-  const departmentScoresData = useMemo(() => departments.map((dept) => dept.averageScore), []);
-  const departmentScoresLabels = useMemo(() => departments.map((dept) => dept.name), []);
+
+  // Pending Tasks by User — Column I (weekPending) sorted desc, Column D (target) as total
+  const sortedPendingList = useMemo(() => {
+    return [...sheetEmployees]
+      .map(emp => ({
+        name: emp.name,
+        pending: parseFloat(emp.weekPending) || 0,
+        total: parseFloat(emp.target) || 0
+      }))
+      .filter(emp => emp.pending > 0)
+      .sort((a, b) => b.pending - a.pending)
+      .slice(0, 5);
+  }, [sheetEmployees]);
+
+  const pendingTasksData = useMemo(() => sortedPendingList.map(emp => emp.pending), [sortedPendingList]);
+  const pendingTasksLabels = useMemo(() => sortedPendingList.map(emp => emp.name), [sortedPendingList]);
+  const pendingTasksTotalData = useMemo(() => sortedPendingList.map(emp => emp.total), [sortedPendingList]);
+  const departmentScoresData = useMemo(() => departmentScores.map((dept) => dept.workNotDonePct), [departmentScores]);
+  const departmentScoresLabels = useMemo(() => departmentScores.map((dept) => dept.name), [departmentScores]);
+  const departmentScoresNotDoneOnTime = useMemo(() => departmentScores.map((dept) => dept.notDoneOnTimePct), [departmentScores]);
+  const departmentScoresPending = useMemo(() => departmentScores.map((dept) => dept.pendingWorks), [departmentScores]);
 
   const handleSelectAll = () => {
     if (selectAll) {
@@ -504,8 +554,6 @@ const AdminDashboard = () => {
     }
     setSelectAll(!selectAll);
   };
-
-
 
   const handleEmployeeSelect = (employeeId) => {
     setSelectedEmployees((prev) => {
@@ -518,7 +566,6 @@ const AdminDashboard = () => {
   };
 
   const handleCommitmentChange = (employeeId, field, value) => {
-    // Allow empty string to clear the field (showing placeholder)
     if (value === "") {
       setEmployeeCommitments((prev) => ({
         ...prev,
@@ -530,111 +577,273 @@ const AdminDashboard = () => {
       return;
     }
 
-    // Only set if valid number
-    const num = parseInt(value);
-    if (!isNaN(num)) {
+    if (field === "commitment") {
       setEmployeeCommitments((prev) => ({
         ...prev,
         [employeeId]: {
           ...prev[employeeId],
-          [field]: num,
+          [field]: value,
         },
       }));
+    } else {
+      const num = parseInt(value);
+      if (!isNaN(num)) {
+        setEmployeeCommitments((prev) => ({
+          ...prev,
+          [employeeId]: {
+            ...prev[employeeId],
+            [field]: num,
+          },
+        }));
+      }
     }
   };
 
   const handleRowClick = (employee) => {
-    // Add demo task data for the selected user
-    const employeeWithDemoTasks = {
-      ...employee,
-      tasks: [
-        {
-          fmsName: "Project Alpha",
-          taskName: "Design System Implementation",
-          target: 100,
-          actualAchievement: 85,
-          workNotDone: 15,
-          workNotDoneOnTime: 8,
-          allPendingTillDate: 3,
-        },
-        {
-          fmsName: "Project Beta",
-          taskName: "API Integration",
-          target: 100,
-          actualAchievement: 92,
-          workNotDone: 8,
-          workNotDoneOnTime: 5,
-          allPendingTillDate: 1,
-        },
-        {
-          fmsName: "Project Gamma",
-          taskName: "User Testing",
-          target: 100,
-          actualAchievement: 78,
-          workNotDone: 22,
-          workNotDoneOnTime: 12,
-          allPendingTillDate: 5,
-        },
-        {
-          fmsName: "Project Delta",
-          taskName: "Documentation",
-          target: 100,
-          actualAchievement: 95,
-          workNotDone: 5,
-          workNotDoneOnTime: 2,
-          allPendingTillDate: 0,
-        },
-        {
-          fmsName: "Project Epsilon",
-          taskName: "Performance Optimization",
-          target: 100,
-          actualAchievement: 88,
-          workNotDone: 12,
-          workNotDoneOnTime: 7,
-          allPendingTillDate: 2,
-        },
-      ],
-    };
-    setSelectedUserDetails(employeeWithDemoTasks);
+    const personName = String(employee.name).trim();
+    const matchingRows = dataSheetRows.filter(row => {
+      const dataName = row[4] ? String(row[4]).trim() : "";
+      return dataName === personName;
+    });
+
+    const tasks = matchingRows.map(row => ({
+      fmsName: row[2] || "",
+      taskName: row[3] || "",
+      nameColRef: row[9] || "",
+      taskNameColRef: row[26] || "",
+      department: row[0] || "",
+      sheetId: row[5] || "",
+      scriptUrl: row[25] || "",
+      plannedSheetRef: row[7] || "",
+      actualSheetRef: row[8] || "",
+      target: row[10] || 0,
+      totalAchievement: row[11] || 0,
+      workNotDone: row[12] || 0,
+      workNotDoneOnTime: row[13] || 0,
+      allPendingTillDate: row[14] || 0,
+      delayColRef: row[27] || ""
+    }));
+
+    setSelectedUserDetails({ ...employee, tasks });
   };
 
-  const handleDrillDown = (task, type, value, event) => {
+  // Helper: Parse sheet reference like "FMS 1!O7:O"
+  const parseSheetRef = (ref) => {
+    if (!ref) return null;
+    const str = String(ref).trim();
+    const bangIndex = str.indexOf("!");
+    if (bangIndex === -1) return { sheetName: str, colIndex: -1, startRowIndex: 0 };
+    const sheetName = str.substring(0, bangIndex);
+    const rangePart = str.substring(bangIndex + 1);
+
+    const colMatch = rangePart.match(/^([A-Za-z]+)(\d*)/);
+    if (!colMatch) return { sheetName, colIndex: -1, startRowIndex: 0 };
+
+    const colLetter = colMatch[1].toUpperCase();
+    let colIndex = 0;
+    for (let i = 0; i < colLetter.length; i++) {
+      colIndex = colIndex * 26 + (colLetter.charCodeAt(i) - 64);
+    }
+    colIndex -= 1;
+
+    const startRow = colMatch[2] ? parseInt(colMatch[2]) : 1;
+    const startRowIndex = startRow > 0 ? startRow - 1 : 0;
+
+    return { sheetName, colIndex, startRowIndex };
+  };
+
+  const handleDrillDown = async (task, type, value, event) => {
     event.stopPropagation();
     if (value === 0) return;
 
-    // Generate dummy data based on count
-    const rows = Array.from({ length: value }, (_, i) => {
-      const planned = new Date(Date.now() - Math.floor(Math.random() * 10000000000));
-      const actual = new Date(planned.getTime() + Math.floor(Math.random() * 172800000)); // +0-48 hours
+    const scriptUrl = String(task.scriptUrl || "").trim();
+    if (!scriptUrl) {
+      console.error("No App Script URL found in Data sheet Column Z for task:", task.taskName);
+      return;
+    }
 
-      return {
-        id: `TD-${Math.floor(Math.random() * 10000)}`,
-        description: `${type} item for ${task.taskName} - ${i + 1}`,
-        plannedDate: planned.toLocaleDateString(),
-        actualDate: actual.toLocaleDateString(),
-        delayHours: Math.floor(Math.random() * 48)
-      };
-    });
+    const plannedParsed = parseSheetRef(task.plannedSheetRef);
+    const actualParsed = parseSheetRef(task.actualSheetRef);
+    const nameParsed = parseSheetRef(task.nameColRef);
+    const taskNameParsed = parseSheetRef(task.taskNameColRef);
+    const delayParsed = parseSheetRef(task.delayColRef);
 
+    setDrillDownLoading(true);
     setActiveDrillDown({
-      taskId: task.taskName, // using taskName as ID since there's no unique ID in demo data
+      taskId: task.taskName,
       type,
-      count: value,
-      rows,
-      title: `${type} Details (${value})`
+      title: `Total Achievement Details`,
+      rows: [],
+      loading: true
     });
+
+    try {
+      const employeeName = String(selectedUserDetails?.name || "").trim();
+
+      const sheetDataCache = {};
+      const sheetsToFetch = new Set();
+      if (plannedParsed?.sheetName) sheetsToFetch.add(plannedParsed.sheetName);
+      if (actualParsed?.sheetName) sheetsToFetch.add(actualParsed.sheetName);
+      if (nameParsed?.sheetName) sheetsToFetch.add(nameParsed.sheetName);
+      if (taskNameParsed?.sheetName) sheetsToFetch.add(taskNameParsed.sheetName);
+      if (delayParsed?.sheetName) sheetsToFetch.add(delayParsed.sheetName);
+
+      const fetchPromises = [...sheetsToFetch].map(async (name) => {
+        const res = await fetch(`${scriptUrl}?sheet=${encodeURIComponent(name)}`);
+        const result = await res.json();
+        sheetDataCache[name] = (result.success && Array.isArray(result.data)) ? result.data : [];
+      });
+      await Promise.all(fetchPromises);
+
+      const formatDateValue = (val) => {
+        if (val === undefined || val === null || val === "") return "";
+        const str = String(val);
+        const d = new Date(str);
+        if (!isNaN(d.getTime()) && (str.includes("T") || str.includes("-") || str.includes("/"))) {
+          const dd = String(d.getDate()).padStart(2, "0");
+          const mm = String(d.getMonth() + 1).padStart(2, "0");
+          const yyyy = d.getFullYear();
+          const hh = String(d.getHours()).padStart(2, "0");
+          const min = String(d.getMinutes()).padStart(2, "0");
+          const ss = String(d.getSeconds()).padStart(2, "0");
+          return `${dd}/${mm}/${yyyy} ${hh}:${min}:${ss}`;
+        }
+        return str;
+      };
+
+      const formatDurationValue = (val) => {
+        if (val === undefined || val === null || val === "") return "";
+        const str = String(val).toLowerCase();
+
+        // Handle ISO Date strings (often used for durations in Sheet JSON)
+        const d = new Date(val);
+        if (!isNaN(d.getTime()) && (String(val).includes("T") || String(val).includes("-"))) {
+          // Check if it's near the spreadsheet epoch (1899/1900)
+          const year = d.getUTCFullYear();
+          if (year <= 1900) {
+            // Spreadsheet epoch is usually Dec 30, 1899
+            const epoch = new Date(Date.UTC(1899, 11, 30));
+            const diffMs = d.getTime() - epoch.getTime();
+            const totalSeconds = Math.floor(diffMs / 1000);
+
+            if (totalSeconds >= 0) {
+              const h = Math.floor(totalSeconds / 3600);
+              const m = Math.floor((totalSeconds % 3600) / 60);
+              const s = totalSeconds % 60;
+              return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+            }
+          }
+          // For other dates, just show the time part as a fallback
+          const hh = String(d.getHours()).padStart(2, "0");
+          const mm = String(d.getMinutes()).padStart(2, "0");
+          const ss = String(d.getSeconds()).padStart(2, "0");
+          return `${hh}:${mm}:${ss}`;
+        }
+
+        // Handle "X day Y hr Z min" format
+        if (str.includes("day") || str.includes("hour") || str.includes("hr") || str.includes("min")) {
+          let days = 0, hours = 0, minutes = 0, seconds = 0;
+          const dayMatch = str.match(/(\d+)\s*day/);
+          const hrMatch = str.match(/(\d+)\s*(hour|hr)/);
+          const minMatch = str.match(/(\d+)\s*min/);
+          const secMatch = str.match(/(\d+)\s*sec/);
+
+          if (dayMatch) days = parseInt(dayMatch[1]);
+          if (hrMatch) hours = parseInt(hrMatch[1]);
+          if (minMatch) minutes = parseInt(minMatch[1]);
+          if (secMatch) seconds = parseInt(secMatch[1]);
+
+          const totalHours = (days * 24) + hours;
+          return `${String(totalHours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+        }
+
+        // Handle numeric durations (fractions of a day)
+        if (!isNaN(val) && !isNaN(parseFloat(val))) {
+          const totalSeconds = Math.round(parseFloat(val) * 24 * 60 * 60);
+          const h = Math.floor(totalSeconds / 3600);
+          const m = Math.floor((totalSeconds % 3600) / 60);
+          const s = totalSeconds % 60;
+          return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+        }
+
+        return String(val);
+      };
+
+      let matchingRowIndices = null;
+
+      if (nameParsed && nameParsed.sheetName && nameParsed.colIndex >= 0) {
+        const nameSheetRows = sheetDataCache[nameParsed.sheetName] || [];
+        const nameRowsFromStart = nameParsed.startRowIndex > 0
+          ? nameSheetRows.slice(nameParsed.startRowIndex)
+          : nameSheetRows;
+
+        matchingRowIndices = [];
+        nameRowsFromStart.forEach((row, idx) => {
+          const nameInSheet = row[nameParsed.colIndex] ? String(row[nameParsed.colIndex]).trim() : "";
+          if (nameInSheet === employeeName) {
+            matchingRowIndices.push(idx);
+          }
+        });
+      }
+
+      const getColumnValues = (parsed, formatter = formatDateValue) => {
+        if (!parsed || !parsed.sheetName || parsed.colIndex < 0) return [];
+        const allRows = sheetDataCache[parsed.sheetName] || [];
+        const rowsFromStart = parsed.startRowIndex > 0 ? allRows.slice(parsed.startRowIndex) : allRows;
+
+        if (matchingRowIndices !== null) {
+          return matchingRowIndices.map(idx =>
+            rowsFromStart[idx] !== undefined ? formatter(rowsFromStart[idx][parsed.colIndex]) : ""
+          );
+        } else {
+          return rowsFromStart.map(row => formatter(row[parsed.colIndex]));
+        }
+      };
+
+      const plannedValues = getColumnValues(plannedParsed);
+      const actualValues = getColumnValues(actualParsed);
+      const taskNameValues = getColumnValues(taskNameParsed);
+      const delayValues = getColumnValues(delayParsed, formatDurationValue);
+
+      const maxLen = Math.max(plannedValues.length, actualValues.length, taskNameValues.length);
+      const rows = [];
+      for (let i = 0; i < maxLen; i++) {
+        const delayVal = delayValues[i] || "";
+        // Only show data where delay is present and non-zero
+        if (delayVal && delayVal !== "00:00:00" && delayVal !== "0") {
+          rows.push({
+            taskName: taskNameValues[i] || "",
+            planned: plannedValues[i] || "",
+            actual: actualValues[i] || "",
+            delay: delayVal
+          });
+        }
+      }
+
+      setActiveDrillDown({
+        taskId: task.taskName,
+        type,
+        title: `Total Achievement Details`,
+        rows,
+        loading: false
+      });
+    } catch (error) {
+      console.error("Error fetching drill-down data:", error);
+      setActiveDrillDown({
+        taskId: task.taskName,
+        type,
+        title: `Total Achievement Details`,
+        rows: [],
+        loading: false,
+        error: error.message
+      });
+    } finally {
+      setDrillDownLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-
-    if (selectedEmployees.length === 0) return;
-
-    if (!assignmentType || !assignmentStartDate || !assignmentEndDate) {
-      alert("Please select Type, Start Date, and End Date.");
-      return;
-    }
-
     setSubmitting(true);
 
     try {
@@ -646,14 +855,13 @@ const AdminDashboard = () => {
 
         const row = [
           emp.name,
-          assignmentStartDate,
-          assignmentEndDate,
+          emp.startDate,
+          emp.endDate,
           inputs.nextWeekPlannedNotDone || "",
           inputs.nextWeekPlannedNotDoneOnTime || "",
           inputs.nextWeekCommitment || ""
         ];
 
-        // 🔹 LOOKUP: Use Name as key, matching how archivedMap is built
         const existing = archivedMap[emp.name];
 
         const payload = existing
@@ -671,22 +879,18 @@ const AdminDashboard = () => {
 
         const response = await fetch(scriptUrl, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/x-www-form-urlencoded"
-          },
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
           body: new URLSearchParams(payload)
         });
 
         const result = await response.json();
 
-        // stop immediately on failure
         if (!result.success) {
           throw new Error(result.error || "Failed to save row");
         }
       }
 
       alert("Saved successfully ✅");
-
       setSelectedEmployees([]);
       setEditableData({});
       setSelectAll(false);
@@ -699,914 +903,87 @@ const AdminDashboard = () => {
     }
   };
 
-  const getNextWeekDateRange = () => {
-    const today = new Date();
-    const nextWeekStart = new Date(today);
-    nextWeekStart.setDate(
-      nextWeekStart.getDate() + (8 - nextWeekStart.getDay())
-    );
-    const nextWeekEnd = new Date(nextWeekStart);
-    nextWeekEnd.setDate(nextWeekEnd.getDate() + 6);
-
-    return {
-      start: nextWeekStart.toISOString().split("T")[0],
-      end: nextWeekEnd.toISOString().split("T")[0],
-    };
-  };
-
   return (
     <div className="space-y-4 lg:space-y-6 p-2 md:p-4">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-        <h1 className="text-lg md:text-2xl font-bold text-gray-800">
-          Admin Dashboard
-        </h1>
-        <button
-          onClick={() => {
-            const visibleColsList = ALL_COLUMNS.filter(col => visibleColumns[col.key]);
+      <DashboardHeader
+        ALL_COLUMNS={ALL_COLUMNS}
+        visibleColumns={visibleColumns}
+        filteredEmployees={filteredEmployees}
+        employeeCommitments={employeeCommitments}
+        topWorstPerformers={topScorers}
+        topBestPerformers={topBestPerformers}
+        pendingTasks={sortedPendingList}
+        departmentScores={departmentScores}
+      />
 
-            // Merge employee commitments into filtered employee data for the PDF
-            const pdfData = filteredEmployees.map(emp => ({
-              ...emp,
-              nextWeekPlannedWorkNotDone: employeeCommitments[emp.id]?.nextWeekPlannedWorkNotDone || emp.nextWeekPlannedWorkNotDone,
-              nextWeekPlannedWorkNotDoneOnTime: employeeCommitments[emp.id]?.nextWeekPlannedWorkNotDoneOnTime || emp.nextWeekPlannedWorkNotDoneOnTime,
-              nextWeekCommitment: employeeCommitments[emp.id]?.commitment || emp.nextWeekCommitment
-            }));
+      {/* Employee List */}
+      <EmployeeListSection
+        ALL_COLUMNS={ALL_COLUMNS}
+        visibleColumns={visibleColumns}
+        showColumnFilter={showColumnFilter}
+        setShowColumnFilter={setShowColumnFilter}
+        toggleColumn={toggleColumn}
+        toggleAllColumns={toggleAllColumns}
+        columnLabels={columnLabels}
+        filterName={filterName}
+        setFilterName={setFilterName}
+        filterDepartment={filterDepartment}
+        setFilterDepartment={setFilterDepartment}
+        uniqueDesignations={uniqueDesignations}
+        handleSubmit={handleSubmit}
+        selectedEmployees={selectedEmployees}
+        submitting={submitting}
+        loading={loading}
+        filteredEmployees={filteredEmployees}
+        selectAll={selectAll}
+        handleSelectAll={handleSelectAll}
+        handleCheckboxChange={handleCheckboxChange}
+        handleEmployeeSelect={handleEmployeeSelect}
+        handleRowClick={handleRowClick}
+        editableData={editableData}
+        handleInputChange={handleInputChange}
+        expandedEmployee={expandedEmployee}
+        setExpandedEmployee={setExpandedEmployee}
+        employeeCommitments={employeeCommitments}
+        handleCommitmentChange={handleCommitmentChange}
+      />
 
-            generateDashboardPDF(visibleColsList, pdfData);
-          }}
-          className="w-full sm:w-auto inline-flex items-center justify-center px-3 py-2 border border-transparent rounded-md shadow-sm text-xs md:text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-        >
-          <Download className="h-4 w-4 mr-2" />
-          Download Report
-        </button>
-      </div>
+      {/* Modals (User Details + Drill Down) */}
+      <UserDetailsModal
+        selectedUserDetails={selectedUserDetails}
+        setSelectedUserDetails={setSelectedUserDetails}
+        activeDrillDown={activeDrillDown}
+        setActiveDrillDown={setActiveDrillDown}
+        handleDrillDown={handleDrillDown}
+      />
 
-      {/* List of People Section */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
-        <div className="p-3 md:p-4 border-b border-gray-200">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-            <h2 className="text-base md:text-lg font-semibold text-gray-800">
-              List of People
-            </h2>
-            <div className="flex gap-2 w-full sm:w-auto relative items-end">
-
-              {/* Conditional Date Assignment Toolbar */}
-              {/* Conditional Date Assignment Toolbar */}
-              {selectedEmployees.length > 0 && (
-                <DateAssignmentToolbar
-                  assignmentType={assignmentType}
-                  handleTypeChange={handleTypeChange}
-                  assignmentStartDate={assignmentStartDate}
-                  handleStartDateChange={handleStartDateChange}
-                  assignmentEndDate={assignmentEndDate}
-                  handleEndDateChange={handleEndDateChange}
-                />
-              )}
-
-              <div className="relative">
-                <button
-                  onClick={() => setShowColumnFilter(!showColumnFilter)}
-                  className="w-full sm:w-auto inline-flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
-                >
-                  <Filter className="h-4 w-4 mr-2" />
-                  Columns
-                </button>
-                {showColumnFilter && (
-                  <div className="absolute right-0 sm:left-0 mt-2 w-64 bg-white border border-gray-200 rounded-md shadow-lg z-50 max-h-80 overflow-y-auto">
-                    <div className="p-2 border-b border-gray-100 sticky top-0 bg-white z-10">
-                      <label className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={Object.values(visibleColumns).every(Boolean)}
-                          onChange={toggleAllColumns}
-                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="ml-2 text-sm text-gray-900 font-semibold">Select All</span>
-                      </label>
-                    </div>
-                    <div className="p-2 space-y-1">
-                      {ALL_COLUMNS.map((col) => (
-                        <label
-                          key={col.key}
-                          className="flex items-center p-2 hover:bg-gray-50 rounded cursor-pointer"
-                        >
-                          <input
-                            type="checkbox"
-                            checked={visibleColumns[col.key]}
-                            onChange={() => toggleColumn(col.key)}
-                            className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                          />
-                          <span className="ml-2 text-sm text-gray-700">
-                            {col.label}
-                          </span>
-                        </label>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-              <button
-                onClick={handleSubmit}
-                disabled={selectedEmployees.length === 0}
-                className="w-full sm:w-auto px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed text-sm transition-colors"
-              >
-                Submit ({selectedEmployees.length})
-              </button>
-            </div>
-          </div>
-
-          {/* Filters */}
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Filter by Name
-              </label>
-              <input
-                type="text"
-                placeholder="Search employee name..."
-                value={filterName}
-                onChange={(e) => setFilterName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Filter by Department
-              </label>
-              <select
-                value={filterDepartment}
-                onChange={(e) => setFilterDepartment(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All Departments</option>
-                {uniqueDepartments.map((dept) => (
-                  <option key={dept} value={dept}>
-                    {dept}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-medium text-gray-700 mb-1">
-                Filter by HR Name
-              </label>
-              <select
-                value={filterHR}
-                onChange={(e) => setFilterHR(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="">All HR Names</option>
-                {uniqueHRNames.map((hr) => (
-                  <option key={hr} value={hr}>
-                    {hr}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-        </div>
-
-        {/* Desktop Table */}
-        <div className="hidden md:block overflow-y-auto max-h-96">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="w-12 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  <input
-                    type="checkbox"
-                    checked={selectAll}
-                    onChange={handleSelectAll}
-                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
-
-                {visibleColumns.name && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.name}
-                  </th>
-                )}
-                {visibleColumns.designation && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.designation}
-                  </th>
-                )}
-                {visibleColumns.target && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.target}
-                  </th>
-                )}
-                {visibleColumns.actualWork && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.actualWork}
-                  </th>
-                )}
-                {visibleColumns.weeklyDone && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.weeklyDone}
-                  </th>
-                )}
-                {visibleColumns.weeklyOnTime && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.weeklyOnTime}
-                  </th>
-                )}
-                {visibleColumns.totalWork && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.totalWork}
-                  </th>
-                )}
-                {visibleColumns.weekPending && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.weekPending}
-                  </th>
-                )}
-                {visibleColumns.allPending && (
-                  <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider whitespace-nowrap">
-                    {columnLabels.allPending}
-                  </th>
-                )}
-                {visibleColumns.lastWeekPlannedNotDone && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-red-100 text-red-700">
-                    Last Week Planned Work Not Done %
-                  </th>
-                )}
-                {visibleColumns.lastWeekPlannedNotDoneOnTime && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-red-100 text-red-700">
-                    Last Week Planned Work Not Done On Time %
-                  </th>
-                )}
-                {visibleColumns.lastWeekCommitment && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-red-100 text-red-700">
-                    Last Week Commitment
-                  </th>
-                )}
-                {visibleColumns.nextWeekPlannedNotDone && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-green-100 text-green-700">
-                    {columnLabels.nextWeekPlannedNotDone}
-                  </th>
-                )}
-                {visibleColumns.nextWeekPlannedNotDoneOnTime && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-green-100 text-green-700">
-                    {columnLabels.nextWeekPlannedNotDoneOnTime}
-                  </th>
-                )}
-                {visibleColumns.nextWeekCommitment && (
-                  <th className="px-3 py-3 text-left text-xs font-bold uppercase tracking-wider whitespace-nowrap bg-green-100 text-green-700">
-                    {columnLabels.nextWeekCommitment}
-                  </th>
-                )}
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredEmployees.map((employee) => (
-                <tr
-                  key={employee.id}
-                  onClick={() => handleRowClick(employee)}
-                  className={`hover:bg-gray-50 cursor-pointer ${selectedEmployees.includes(employee.id) ? "bg-blue-50" : ""
-                    }`}
-                >
-                  <td
-                    className="w-12 px-3 py-4"
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployees.includes(employee.id)}
-                      onChange={() => handleCheckboxChange(employee.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                  </td>
-
-
-                  {visibleColumns.name && (
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <img
-                          className="h-8 w-8 rounded-full object-cover"
-                          src={employee.image}
-                          alt={employee.name}
-                        />
-                        <div className="ml-3">
-                          <div className="text-sm font-medium text-gray-900">
-                            {employee.name}
-                          </div>
-
-                        </div>
-                      </div>
-                    </td>
-                  )}
-                  {visibleColumns.designation && (
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {employee.designation}
-                    </td>
-                  )}
-                  {visibleColumns.target && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.target}
-                    </td>
-                  )}
-                  {visibleColumns.actualWork && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.actualWorkDone}
-                    </td>
-                  )}
-                  {visibleColumns.weeklyDone && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.weeklyWorkDone}
-                    </td>
-                  )}
-                  {visibleColumns.weeklyOnTime && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.weeklyWorkDoneOnTime}
-                    </td>
-                  )}
-                  {visibleColumns.totalWork && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.totalWorkDone}
-                    </td>
-                  )}
-                  {visibleColumns.weekPending && (
-                    <td className="px-3 py-4 whitespace-nowrap text-center">
-                      <span
-                        className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${employee.weekPending > 3
-                          ? "bg-red-100 text-red-800"
-                          : employee.weekPending > 1
-                            ? "bg-yellow-100 text-yellow-800"
-                            : "bg-green-100 text-green-800"
-                          }`}
-                      >
-                        {employee.weekPending}
-                      </span>
-                    </td>
-                  )}
-                  {visibleColumns.allPending && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-center">
-                      {employee.allPendingTillDate}
-                    </td>
-                  )}
-                  {visibleColumns.lastWeekPlannedNotDone && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm bg-red-50 text-red-800 font-medium text-center">
-                      {employee.plannedWorkNotDone}%
-                    </td>
-                  )}
-                  {visibleColumns.lastWeekPlannedNotDoneOnTime && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm bg-red-50 text-red-800 font-medium text-center">
-                      {employee.plannedWorkNotDoneOnTime}%
-                    </td>
-                  )}
-                  {visibleColumns.lastWeekCommitment && (
-                    <td className="px-3 py-4 whitespace-nowrap text-sm bg-red-50 text-red-800 font-medium text-center">
-                      {employee.commitment}%
-                    </td>
-                  )}
-                  {visibleColumns.nextWeekPlannedNotDone && (
-                    <td className="px-3 py-4 whitespace-nowrap bg-green-50 text-center">
-                      {selectedEmployees.includes(employee.id) ? (
-                        <input
-                          type="text"
-                          placeholder="0"
-                          value={editableData[employee.id]?.nextWeekPlannedNotDone || ""}
-                          onChange={(e) =>
-                            handleInputChange(
-                              employee.id,
-                              "nextWeekPlannedNotDone",
-                              e.target.value
-                            )
-                          }
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span className="text-sm text-green-800 font-medium">{employee.nextWeekPlannedWorkNotDone || 0}</span>
-                      )}
-                    </td>
-                  )}
-                  {visibleColumns.nextWeekPlannedNotDoneOnTime && (
-                    <td className="px-3 py-4 whitespace-nowrap bg-green-50 text-center">
-                      {selectedEmployees.includes(employee.id) ? (
-                        <input
-                          type="text"
-                          placeholder="0"
-                          value={editableData[employee.id]?.nextWeekPlannedNotDoneOnTime || ""}
-                          onChange={(e) =>
-                            handleInputChange(
-                              employee.id,
-                              "nextWeekPlannedNotDoneOnTime",
-                              e.target.value
-                            )
-                          }
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span className="text-sm text-green-800 font-medium">{employee.nextWeekPlannedWorkNotDoneOnTime || 0}</span>
-                      )}
-                    </td>
-                  )}
-                  {visibleColumns.nextWeekCommitment && (
-                    <td className="px-3 py-4 whitespace-nowrap bg-green-50 text-center">
-                      {selectedEmployees.includes(employee.id) ? (
-                        <input
-                          type="text"
-                          placeholder="0"
-                          value={editableData[employee.id]?.nextWeekCommitment || ""}
-                          onChange={(e) =>
-                            handleInputChange(
-                              employee.id,
-                              "nextWeekCommitment",
-                              e.target.value
-                            )
-                          }
-                          className="w-16 px-2 py-1 border border-gray-300 rounded text-sm [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          onClick={(e) => e.stopPropagation()}
-                        />
-                      ) : (
-                        <span className="text-sm text-green-800 font-medium">{employee.nextWeekCommitment || 0}</span>
-                      )}
-                    </td>
-                  )}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile View - Fixed */}
-        <div className="md:hidden">
-          <div className="px-3 py-3 bg-gray-50 flex items-center gap-3 border-b border-gray-200 sticky top-0 z-10">
-            <input
-              type="checkbox"
-              checked={selectAll}
-              onChange={handleSelectAll}
-              className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-            />
-            <span className="text-sm font-medium text-gray-700">
-              Select All ({filteredEmployees.length})
-            </span>
-          </div>
-
-          <div className="max-h-[60vh] overflow-y-auto">
-            {filteredEmployees.map((employee) => (
-              <div
-                key={employee.id}
-                className={`border-b border-gray-200 ${selectedEmployees.includes(employee.id) ? "bg-blue-50" : ""
-                  }`}
-              >
-                <div className="p-3">
-                  <div className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      checked={selectedEmployees.includes(employee.id)}
-                      onChange={() => handleEmployeeSelect(employee.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 mt-1 flex-shrink-0"
-                    />
-                    <div className="flex-1 min-w-0">
-                      <div
-                        className="flex items-center gap-2 cursor-pointer"
-                        onClick={() => handleRowClick(employee)}
-                      >
-                        <img
-                          className="h-10 w-10 rounded-full object-cover flex-shrink-0"
-                          src={employee.image}
-                          alt={employee.name}
-                        />
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-medium text-gray-900 truncate">
-                            {employee.name}
-                          </div>
-
-                        </div>
-                      </div>
-
-                      {/* Quick Stats */}
-                      <div className="mt-2 grid grid-cols-2 gap-2 text-xs">
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Target:</span>
-                          <span className="font-semibold">
-                            {employee.target}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Actual:</span>
-                          <span className="font-semibold">
-                            {employee.actualWorkDone}%
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Pending:</span>
-                          <span
-                            className={`font-semibold ${employee.weekPending > 3
-                              ? "text-red-600"
-                              : employee.weekPending > 1
-                                ? "text-yellow-600"
-                                : "text-green-600"
-                              }`}
-                          >
-                            {employee.weekPending}
-                          </span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-gray-500">Commitment:</span>
-                          <span className="font-semibold">
-                            {employee.commitment}%
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() =>
-                        setExpandedEmployee(
-                          expandedEmployee === employee.id ? null : employee.id
-                        )
-                      }
-                      className="p-2 hover:bg-gray-200 rounded flex-shrink-0"
-                    >
-                      <ChevronDown
-                        className={`w-4 h-4 transition-transform ${expandedEmployee === employee.id ? "rotate-180" : ""
-                          }`}
-                      />
-                    </button>
-                  </div>
-
-                  {/* Expanded Content */}
-                  {expandedEmployee === employee.id && (
-                    <div className="mt-3 space-y-3 border-t border-gray-200 pt-3">
-                      <div className="grid grid-cols-2 gap-3 text-xs">
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-gray-500">Weekly Done</p>
-                          <p className="font-semibold text-gray-900">
-                            {employee.weeklyWorkDone}%
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-gray-500">On Time</p>
-                          <p className="font-semibold text-gray-900">
-                            {employee.weeklyWorkDoneOnTime}%
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-gray-500">Total Work</p>
-                          <p className="font-semibold text-gray-900">
-                            {employee.totalWorkDone}%
-                          </p>
-                        </div>
-                        <div className="bg-gray-50 p-2 rounded">
-                          <p className="text-gray-500">All Pending</p>
-                          <p className="font-semibold text-gray-900">
-                            {employee.allPendingTillDate}
-                          </p>
-                        </div>
-                      </div>
-
-                      {selectedEmployees.includes(employee.id) && (
-                        <div className="bg-blue-50 p-3 rounded border border-blue-200 space-y-3">
-                          <p className="text-xs font-semibold text-blue-900">
-                            Next Week Inputs
-                          </p>
-                          <div className="space-y-2">
-                            <div>
-                              <label className="text-xs text-gray-600 block mb-1">
-                                Work Not Done %
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={
-                                  employeeCommitments[employee.id]
-                                    ?.nextWeekPlannedWorkNotDone || 0
-                                }
-                                onChange={(e) =>
-                                  handleCommitmentChange(
-                                    employee.id,
-                                    "nextWeekPlannedWorkNotDone",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-gray-600 block mb-1">
-                                Work Not Done On Time %
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={
-                                  employeeCommitments[employee.id]
-                                    ?.nextWeekPlannedWorkNotDoneOnTime || 0
-                                }
-                                onChange={(e) =>
-                                  handleCommitmentChange(
-                                    employee.id,
-                                    "nextWeekPlannedWorkNotDoneOnTime",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            </div>
-                            <div>
-                              <label className="text-xs text-gray-600 block mb-1">
-                                Commitment %
-                              </label>
-                              <input
-                                type="number"
-                                min="0"
-                                max="100"
-                                value={
-                                  employeeCommitments[employee.id]
-                                    ?.commitment || 0
-                                }
-                                onChange={(e) =>
-                                  handleCommitmentChange(
-                                    employee.id,
-                                    "commitment",
-                                    e.target.value
-                                  )
-                                }
-                                className="w-full px-2 py-1 border border-gray-300 rounded text-sm"
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* User Details Modal - Fixed for Mobile */}
-      {selectedUserDetails && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-2 md:p-4">
-          <div className="bg-white rounded-lg shadow-lg w-full max-w-6xl max-h-[95vh] overflow-hidden flex flex-col">
-            {/* Header */}
-            <div className="sticky top-0 bg-white border-b border-gray-200 p-4 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-3 min-w-0">
-                <img
-                  className="h-10 w-10 rounded-full object-cover flex-shrink-0"
-                  src={selectedUserDetails.image}
-                  alt={selectedUserDetails.name}
-                />
-                <div className="min-w-0">
-                  <h2 className="text-base font-bold text-gray-900 truncate">
-                    {selectedUserDetails.name}
-                  </h2>
-                  <p className="text-xs text-gray-500 truncate">
-                    {selectedUserDetails.department}
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() => setSelectedUserDetails(null)}
-                className="p-2 hover:bg-gray-100 rounded-full transition-colors flex-shrink-0"
-              >
-                <X className="w-5 h-5 text-gray-600" />
-              </button>
-            </div>
-
-            {/* Scrollable Content */}
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-4 space-y-4">
-                {/* Tasks Table */}
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900 mb-3">
-                    Task Details
-                  </h3>
-                  <div className="overflow-x-auto border border-gray-200 rounded-lg">
-                    <div className="min-w-[600px]">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-100">
-                          <tr>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              FMS Name
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Task Name
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Planned
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Actual
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Delay
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Late
-                            </th>
-                            <th className="px-3 py-2 text-left text-xs font-semibold text-gray-700 uppercase tracking-wider whitespace-nowrap">
-                              Pending
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="bg-white divide-y divide-gray-200">
-                          {selectedUserDetails.tasks &&
-                            selectedUserDetails.tasks.length > 0 ? (
-                            selectedUserDetails.tasks.map((task, idx) => (
-                              <tr key={idx} className="hover:bg-gray-50">
-                                <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
-                                  {task.fmsName}
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
-                                  {task.taskName}
-                                </td>
-                                <td
-                                  className={`px-3 py-2 text-xs text-gray-900 font-medium whitespace-nowrap cursor-pointer hover:bg-blue-50 transition-colors ${activeDrillDown?.taskId === task.taskName && activeDrillDown?.type === "Planned"
-                                    ? "bg-blue-100 font-semibold"
-                                    : ""
-                                    }`}
-                                  onClick={(e) => handleDrillDown(task, "Planned", task.target, e)}
-                                >
-                                  {task.target}
-                                </td>
-                                <td className="px-3 py-2 text-xs font-medium whitespace-nowrap">
-                                  <span
-                                    onClick={(e) => handleDrillDown(task, "Actual", task.actualAchievement, e)}
-                                    className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium cursor-pointer transition-colors ${activeDrillDown?.taskId === task.taskName && activeDrillDown?.type === "Actual"
-                                      ? "ring-2 ring-offset-1 ring-blue-500"
-                                      : ""
-                                      } ${task.actualAchievement < task.target
-                                        ? "bg-red-100 text-red-800 hover:bg-red-200"
-                                        : task.actualAchievement === task.target
-                                          ? "bg-green-100 text-green-800 hover:bg-green-200"
-                                          : "bg-blue-100 text-blue-800 hover:bg-blue-200"
-                                      }`}
-                                  >
-                                    {task.actualAchievement}
-                                  </span>
-                                </td>
-                                <td
-                                  className={`px-3 py-2 text-xs text-gray-900 whitespace-nowrap cursor-pointer hover:bg-blue-50 transition-colors ${activeDrillDown?.taskId === task.taskName && activeDrillDown?.type === "Delay"
-                                    ? "bg-blue-100 font-semibold"
-                                    : ""
-                                    }`}
-                                  onClick={(e) => handleDrillDown(task, "Delay", task.workNotDone, e)}
-                                >
-                                  {task.workNotDone}%
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
-                                  {task.workNotDoneOnTime}%
-                                </td>
-                                <td className="px-3 py-2 text-xs text-gray-900 whitespace-nowrap">
-                                  {task.allPendingTillDate}
-                                </td>
-                              </tr>
-                            ))
-                          ) : (
-                            <tr>
-                              <td
-                                colSpan="7"
-                                className="px-3 py-2 text-center text-xs text-gray-500"
-                              >
-                                No tasks available
-                              </td>
-                            </tr>
-                          )}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-3 flex justify-end gap-2 flex-shrink-0">
-              <button
-                onClick={() => setSelectedUserDetails(null)}
-                className="px-3 py-2 border border-gray-300 rounded text-xs font-medium text-gray-700 hover:bg-gray-100 transition-colors"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Drill Down Modal */}
-      {activeDrillDown && (
-        <div className="fixed inset-0 bg-black bg-opacity-25 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fadeIn border-2 border-gray-100">
-            <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">
-                  {activeDrillDown.title}
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {activeDrillDown.taskId}
-                </p>
-              </div>
-              <button
-                onClick={() => setActiveDrillDown(null)}
-                className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
-
-            <div className="overflow-y-auto flex-1 p-0">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0">
-                  <tr>
-
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Planned</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delay (Hrs)</th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {activeDrillDown.rows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-blue-50 transition-colors">
-
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.plannedDate}</td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.actualDate}</td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-red-600 font-medium">
-                        {row.delayHours}h
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="p-3 border-t border-gray-200 bg-gray-50 rounded-b-lg flex justify-end">
-              <button
-                onClick={() => setActiveDrillDown(null)}
-                className="px-4 py-2 bg-white border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-      {/* Charts Grid - Fixed for Mobile */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-3 md:gap-4">
-        {/* Top 5 Scorers */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <h2 className="text-xs md:text-sm font-semibold text-gray-800 mb-2 md:mb-3">
-            Top 5 Scorers
-          </h2>
-          <div className="h-32 md:h-40 lg:h-48 overflow-hidden">
-            <HalfCircleChart
-              data={topScorersData}
-              labels={topScorersLabels}
-              colors={["#8DD9D5", "#6BBBEA", "#BEA1E8", "#FFB77D", "#FF99A8"]}
-            />
-          </div>
-        </div>
-
-        {/* Pending Tasks */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <h2 className="text-xs md:text-sm font-semibold text-gray-800 mb-2 md:mb-3">
-            Pending Tasks by User
-          </h2>
-          <div className="h-32 md:h-40 lg:h-48">
-            <HorizontalBarChart
-              data={pendingTasksData}
-              labels={pendingTasksLabels}
-              colors={["#ef4444", "#f87171", "#fca5a5", "#fecaca", "#fee2e2"]}
-              maxValue={Math.max(...pendingTasksData) + 1}
-            />
-          </div>
-        </div>
-
-        {/* Lowest Scores */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-          <h2 className="text-xs md:text-sm font-semibold text-gray-800 mb-2 md:mb-3">
-            Lowest Scores
-          </h2>
-          <div className="h-32 md:h-40 lg:h-48 overflow-hidden">
-            <VerticalBarChart
-              data={lowestScorersData}
-              labels={lowestScorersLabels}
-              colors={["#f59e0b", "#fbbf24", "#fcd34d", "#fde68a", "#fef3c7"]}
-              maxValue={100}
-            />
-          </div>
-        </div>
-      </div>
+      {/* Charts */}
+      <ChartsGrid
+        user={user}
+        loading={loading}
+        topScorersData={topScorersData}
+        topScorersLabels={topScorersLabels}
+        pendingTasksData={pendingTasksData}
+        pendingTasksLabels={pendingTasksLabels}
+        pendingTasksTotalData={pendingTasksTotalData}
+        topBestData={topBestData}
+        topBestLabels={topBestLabels}
+        topBestTotalData={topBestTotalData}
+      />
 
       {/* Department Scores */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 md:p-4">
-        <h2 className="text-xs md:text-sm font-semibold text-gray-800 mb-2 md:mb-3">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 lg:p-8 mt-6">
+        <h2 className="text-sm md:text-base font-bold text-gray-800 flex items-center gap-2 mb-6">
+          <div className="w-1.5 h-6 bg-purple-500 rounded-full" />
           Department Scores
         </h2>
-        <div className="h-32 md:h-40 lg:h-48 overflow-hidden">
-          <VerticalBarChart
-            data={departmentScoresData}
+        <div className="h-[400px] md:h-[500px]">
+          <DepartmentScoreChart
             labels={departmentScoresLabels}
-            colors={["#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe"]}
-            maxValue={100}
+            pendingData={departmentScoresPending}
+            notDoneData={departmentScoresData}
+            notDoneOnTimeData={departmentScoresNotDoneOnTime}
           />
         </div>
       </div>

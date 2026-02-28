@@ -40,10 +40,22 @@ export function AuthProvider({ children }) {
               row[0] && String(row[0]).trim().toLowerCase() === String(prevUser.name).trim().toLowerCase()
             );
 
-            if (userRow && userRow[4]) {
+            if (userRow) {
+              // Find actual index in result.data
+              const rowIndex = result.data.findIndex(row =>
+                row[0] && String(row[0]).trim().toLowerCase() === String(prevUser.name).trim().toLowerCase()
+              ) + 1; // +1 for 1-based indexing in sheets
+
               const freshImage = getDisplayableImageUrl(userRow[4]);
-              if (freshImage !== prevUser.image) {
-                const updated = { ...prevUser, image: freshImage };
+
+              // Sync role as well from Column H (index 7)
+              const rawRole = String(userRow[7] || "").trim().toLowerCase();
+              let syncedRole = prevUser.role;
+              if (rawRole === 'admin') syncedRole = 'admin';
+              else if (rawRole === 'user') syncedRole = 'user';
+
+              if (freshImage !== prevUser.image || rowIndex !== prevUser.rowIndex || syncedRole !== prevUser.role) {
+                const updated = { ...prevUser, image: freshImage, rowIndex: rowIndex, role: syncedRole };
                 localStorage.setItem('mis_user', JSON.stringify(updated));
                 return updated;
               }
@@ -91,14 +103,28 @@ export function AuthProvider({ children }) {
         );
 
         if (userRow) {
-          // Determine role based on designation
+          // Determine role based on Column H (index 7) or designation if H is empty
+          const rawRole = String(userRow[7] || "").trim().toLowerCase();
           const designation = String(userRow[3]).toLowerCase();
-          const role = (designation.includes('admin') || designation.includes('manager')) ? 'admin' : 'user';
+
+          let role = 'user'; // Default
+          if (rawRole === 'admin') {
+            role = 'admin';
+          } else if (rawRole === 'user') {
+            role = 'user';
+          } else {
+            // Fallback to designation if Column H is not explicitly 'Admin' or 'User'
+            role = (designation.includes('admin') || designation.includes('manager')) ? 'admin' : 'user';
+          }
+
+          // Get rowIndex (1-based)
+          const rowIndex = usersData.findIndex(row => row === userRow) + 1;
 
           const verifiedUser = {
             id: userRow[5],
             name: userRow[0],
             role: role,
+            rowIndex: rowIndex,
             image: getDisplayableImageUrl(userRow[4]) || `https://ui-avatars.com/api/?name=${encodeURIComponent(userRow[0])}&background=0D8ABC&color=fff`,
             email: userRow[1],
             department: userRow[2],
@@ -120,6 +146,76 @@ export function AuthProvider({ children }) {
     return false;
   };
 
+  // Update profile image function
+  const updateProfileImage = async (file) => {
+    if (!user || !user.rowIndex) return { success: false, error: "User not identified" };
+
+    const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+    if (!scriptUrl) return { success: false, error: "Server URL missing" };
+
+    try {
+      // 1. Convert file to base64
+      const reader = new FileReader();
+      const base64Promise = new Promise((resolve, reject) => {
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const base64Data = await base64Promise;
+
+      const genericUpload = async (base64) => {
+        const response = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            action: 'uploadFile',
+            fileName: `profile_${user.name.replace(/\s+/g, '_')}`,
+            mimeType: file.type,
+            base64Data: base64,
+            folderId: import.meta.env.VITE_DRIVE_FOLDER_ID || '10-mJ-H5P0jp67gX0A7gc6TGlyyku3thB'
+          })
+        });
+        return await response.json();
+      };
+
+      const uploadResult = await genericUpload(base64Data);
+
+      if (uploadResult.success && uploadResult.fileUrl) {
+        const newImageUrl = uploadResult.fileUrl;
+
+        // 3. Update Master Sheet (Column E is index 4)
+        // We use 'update' action with rowIndex and rowData (as array)
+        // Data structure: [0:Name, 1:Email, 2:Dept, 3:Designation, 4:Profile, 5:ID, 6:Pass]
+        const rowUpdate = ["", "", "", "", newImageUrl, "", ""];
+
+        const updateRes = await fetch(scriptUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            action: 'update',
+            sheetName: 'Master',
+            rowIndex: user.rowIndex,
+            rowData: JSON.stringify(rowUpdate)
+          })
+        });
+
+        const updateResult = await updateRes.json();
+
+        if (updateResult.success) {
+          const displayImage = getDisplayableImageUrl(newImageUrl);
+          const updatedUser = { ...user, image: displayImage };
+          setUser(updatedUser);
+          localStorage.setItem('mis_user', JSON.stringify(updatedUser));
+          return { success: true, image: displayImage };
+        }
+      }
+      return { success: false, error: uploadResult.error || "Upload failed" };
+    } catch (err) {
+      console.error("Profile update error:", err);
+      return { success: false, error: err.message };
+    }
+  };
+
   // Logout function
   const logout = () => {
     localStorage.removeItem('mis_user');
@@ -133,7 +229,8 @@ export function AuthProvider({ children }) {
     user,
     login,
     logout,
-    loading
+    loading,
+    updateProfileImage
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

@@ -1,527 +1,302 @@
-import React, { useState, useEffect } from "react";
-import { Calendar, Filter, Users, Target, Trash2 } from "lucide-react";
-import { employees } from "../../data/mockData";
+import React, { useState, useEffect, useMemo } from "react";
+import { Search, Loader2, History } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 const AdminHistoryCommitment = () => {
-  const [dateRange, setDateRange] = useState({
-    startDate: "",
-    endDate: "",
-  });
-  const [selectedEmployee, setSelectedEmployee] = useState("all");
-  const [selectedTarget, setSelectedTarget] = useState("all");
-  const [historyData, setHistoryData] = useState([]);
-  const [filteredHistory, setFilteredHistory] = useState([]);
+    const { user } = useAuth();
+    const [loading, setLoading] = useState(true);
+    const [records, setRecords] = useState([]);
+    const [searchQuery, setSearchQuery] = useState("");
+    const [nameFilter, setNameFilter] = useState("all");
+    const [dateFilter, setDateFilter] = useState("all");
 
-  // Load history from localStorage on mount
-  useEffect(() => {
-    const saved = localStorage.getItem("commitmentHistory");
-    if (saved) {
-      const parsedData = JSON.parse(saved);
-      setHistoryData(parsedData);
-    }
-  }, []);
+    useEffect(() => {
+        const fetchRecords = async () => {
+            try {
+                setLoading(true);
+                const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+                if (!scriptUrl) {
+                    console.error("VITE_APPS_SCRIPT_URL not set");
+                    setLoading(false);
+                    return;
+                }
 
-  // Filter data whenever filters change
-  useEffect(() => {
-    applyFilters();
-  }, [dateRange, selectedEmployee, selectedTarget, historyData]);
+                const response = await fetch(`${scriptUrl}?sheet=Records`);
+                const result = await response.json();
 
-  const handleDateChange = (field, value) => {
-    setDateRange((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
+                if (result.success && Array.isArray(result.data)) {
+                    // Skip header row (index 0), map each row to an object using user-specified column indices
+                    const parsed = result.data.slice(1).map((row, idx) => ({
+                        id: idx,
+                        dateStart: row[0] || "",         // Column A (index 0)
+                        dateEnd: row[1] || "",           // Column B (index 1)
+                        name: row[2] || "",              // Column C (index 2)
+                        target: row[3] || "",            // Column D (index 3)
+                        actualWorkDone: row[4] || "",    // Column E (index 4)
+                        workNotDone: row[5] || "",       // Column F (index 5)
+                        workNotDoneOnTime: row[6] || "", // Column G (index 6)
+                        totalWorkDone: row[7] || "",     // Column H (index 7)
+                        weekPending: row[8] || "",       // Column I (index 8)
+                        allPendingTillDate: row[9] || "", // Column J (index 9)
+                        lastWeekPlannedNotDone: row[10] || "", // Column K (index 10)
+                        lastWeekPlannedNotDoneOnTime: row[11] || "", // Column L (index 11)
+                        lastWeekCommitment: row[12] || "", // Column M (index 12)
+                        linkWithName: row[13] || "", // Column N (index 13)
+                        nextWeekPlannedNotDone: row[14] || "", // Column O (index 14)
+                        nextWeekPlannedNotDoneOnTime: row[15] || "", // Column P (index 15)
+                        nextWeekCommitment: row[16] || "" // Column Q (index 16)
+                    })).filter(r => r.name.trim() !== "");
 
-  const applyFilters = () => {
-    let filtered = [...historyData];
+                    // Filter based on role
+                    const finalRecords = user && user.role === 'admin'
+                        ? parsed
+                        : parsed.filter(r => r.name.toLowerCase() === (user?.name || "").toLowerCase());
 
-    // Date range filter - only apply if both dates are set
-    if (dateRange.startDate && dateRange.endDate) {
-      filtered = filtered.filter((record) => {
-        const recordDate = new Date(record.dateStart);
-        const startDate = new Date(dateRange.startDate);
-        const endDate = new Date(dateRange.endDate);
+                    setRecords(finalRecords);
+                }
+            } catch (error) {
+                console.error("Error fetching Records sheet:", error);
+            } finally {
+                setLoading(false);
+            }
+        };
 
-        return recordDate >= startDate && recordDate <= endDate;
-      });
-    }
+        fetchRecords();
+    }, []);
 
-    // Employee filter
-    if (selectedEmployee !== "all") {
-      filtered = filtered.filter(
-        (record) => record.employeeId === selectedEmployee
-      );
-    }
+    const uniqueNames = useMemo(() => {
+        return [...new Set(records.map(r => r.name))].sort();
+    }, [records]);
 
-    // Target range filter
-    if (selectedTarget !== "all") {
-      const targetValue = parseInt(selectedTarget);
-      filtered = filtered.filter((record) => {
-        return (
-          record.target >= targetValue - 5 && record.target <= targetValue + 5
-        );
-      });
-    }
+    const uniqueDates = useMemo(() => {
+        return [...new Set(records.map(r => r.dateStart))].filter(Boolean).sort((a, b) => new Date(b) - new Date(a));
+    }, [records]);
 
-    setFilteredHistory(filtered);
-  };
+    const filteredRecords = useMemo(() => {
+        return records.filter(r => {
+            const matchesSearch =
+                r.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                r.dateStart.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                r.dateEnd.toLowerCase().includes(searchQuery.toLowerCase());
+            const matchesName = nameFilter === "all" || r.name === nameFilter;
+            const matchesDate = dateFilter === "all" || r.dateStart === dateFilter;
+            return matchesSearch && matchesName && matchesDate;
+        });
+    }, [records, searchQuery, nameFilter, dateFilter]);
 
-  const handleClearFilters = () => {
-    setDateRange({
-      startDate: "",
-      endDate: "",
-    });
-    setSelectedEmployee("all");
-    setSelectedTarget("all");
-  };
-
-  const handleDeleteRecord = (index) => {
-    if (window.confirm("Are you sure you want to delete this record?")) {
-      const updatedHistory = historyData.filter((_, i) => i !== index);
-      setHistoryData(updatedHistory);
-      localStorage.setItem("commitmentHistory", JSON.stringify(updatedHistory));
-    }
-  };
-
-  const calculateStats = () => {
-    if (filteredHistory.length === 0) {
-      return {
-        totalRecords: 0,
-        avgCommitment: 0,
-        avgWorkNotDone: 0,
-        avgWorkNotDoneOnTime: 0,
-      };
-    }
-
-    return {
-      totalRecords: filteredHistory.length,
-      avgCommitment: Math.round(
-        filteredHistory.reduce((acc, rec) => acc + rec.commitment, 0) /
-          filteredHistory.length
-      ),
-      avgWorkNotDone: Math.round(
-        filteredHistory.reduce(
-          (acc, rec) => acc + rec.nextWeekPlannedWorkNotDone,
-          0
-        ) / filteredHistory.length
-      ),
-      avgWorkNotDoneOnTime: Math.round(
-        filteredHistory.reduce(
-          (acc, rec) => acc + rec.nextWeekPlannedWorkNotDoneOnTime,
-          0
-        ) / filteredHistory.length
-      ),
+    const formatValue = (val) => {
+        if (val === "" || val === null || val === undefined) return "-";
+        return String(val);
     };
-  };
 
-  const stats = calculateStats();
-  const getHistoryIndex = (filteredRecord) => {
-    return historyData.findIndex(
-      (rec) =>
-        rec.employeeId === filteredRecord.employeeId &&
-        rec.dateStart === filteredRecord.dateStart &&
-        rec.dateEnd === filteredRecord.dateEnd
-    );
-  };
-
-  return (
-    <div className="space-y-4 lg:space-y-6">
-      {/* Header */}
-      <div className="flex flex-col gap-3 justify-between items-start sm:flex-row sm:items-center">
-        <div>
-          <h1 className="text-xl font-bold text-gray-800 lg:text-2xl">
-            History Commitment
-          </h1>
-        
-        </div>
-      </div>
-
-      {/* Filters */}
-      <div className="p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="flex gap-2 items-center mb-4">
-          <Filter className="w-5 h-5 text-gray-600" />
-          <h2 className="text-lg font-semibold text-gray-800">Filters</h2>
-          <button
-            onClick={handleClearFilters}
-            className="px-3 py-1 ml-auto text-xs text-gray-700 bg-gray-200 rounded-md transition-colors hover:bg-gray-300"
-          >
-            Clear Filters
-          </button>
-        </div>
-
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Start Date */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Start Date
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 w-4 h-4 text-gray-400 transform -translate-y-1/2 pointer-events-none" />
-              <input
-                type="date"
-                value={dateRange.startDate}
-                onChange={(e) => handleDateChange("startDate", e.target.value)}
-                className="py-2 pr-3 pl-10 w-full text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* End Date */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              End Date
-            </label>
-            <div className="relative">
-              <Calendar className="absolute left-3 top-1/2 w-4 h-4 text-gray-400 transform -translate-y-1/2 pointer-events-none" />
-              <input
-                type="date"
-                value={dateRange.endDate}
-                onChange={(e) => handleDateChange("endDate", e.target.value)}
-                className="py-2 pr-3 pl-10 w-full text-sm rounded-md border border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Employee Filter */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Employee
-            </label>
-            <div className="relative">
-              <Users className="absolute left-3 top-1/2 w-4 h-4 text-gray-400 transform -translate-y-1/2 pointer-events-none" />
-              <select
-                value={selectedEmployee}
-                onChange={(e) => setSelectedEmployee(e.target.value)}
-                className="py-2 pr-8 pl-10 w-full text-sm bg-white rounded-md border border-gray-300 appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Employees</option>
-                {employees.map((emp) => (
-                  <option key={emp.id} value={emp.id}>
-                    {emp.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {/* Target Range Filter */}
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">
-              Target Range
-            </label>
-            <div className="relative">
-              <Target className="absolute left-3 top-1/2 w-4 h-4 text-gray-400 transform -translate-y-1/2 pointer-events-none" />
-              <select
-                value={selectedTarget}
-                onChange={(e) => setSelectedTarget(e.target.value)}
-                className="py-2 pr-8 pl-10 w-full text-sm bg-white rounded-md border border-gray-300 appearance-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Targets</option>
-                <option value="85">80-90%</option>
-                <option value="90">85-95%</option>
-                <option value="95">90-100%</option>
-                <option value="100">95-100%</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* History Table */}
-      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
-        <div className="p-4 border-b border-gray-200">
-          <h2 className="text-lg font-semibold text-gray-800">
-            Commitment History
-          </h2>
-          <p className="mt-1 text-sm text-gray-500">
-            Showing {filteredHistory.length} records for the selected period
-          </p>
-        </div>
-
-        {/* Desktop Table */}
-        <div className="hidden overflow-x-auto lg:block">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Employee ID
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Name
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Department
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Target
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Week Start
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Week End
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Planned % Work Not Done
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Planned % Work Not Done On Time
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Commitment
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Submitted
-                </th>
-                <th className="px-3 py-3 text-xs font-medium tracking-wider text-left text-gray-500 uppercase">
-                  Action
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {filteredHistory.length > 0 ? (
-                filteredHistory.map((record, idx) => {
-                  const historyIndex = getHistoryIndex(record);
-                  const submittedDate = new Date(record.submittedAt);
-                  const formattedDate =
-                    submittedDate.toLocaleDateString("en-IN");
-                  const formattedTime = submittedDate.toLocaleTimeString(
-                    "en-IN",
-                    { hour: "2-digit", minute: "2-digit" }
-                  );
-
-                  return (
-                    <tr key={idx} className="hover:bg-gray-50">
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {record.employeeId}
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          {record.name}
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-600 whitespace-nowrap">
-                        {record.department}
-                      </td>
-                      <td className="px-3 py-4 text-sm font-medium text-gray-900 whitespace-nowrap">
-                        {record.target}%
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        {record.dateStart}
-                      </td>
-                      <td className="px-3 py-4 text-sm text-gray-900 whitespace-nowrap">
-                        {record.dateEnd}
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="flex gap-2 items-center">
-                          <div className="w-12 h-2 bg-gray-200 rounded-full">
-                            <div
-                              className="h-2 bg-blue-600 rounded-full"
-                              style={{
-                                width: `${Math.min(
-                                  record.nextWeekPlannedWorkNotDone,
-                                  100
-                                )}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <span className="w-8 text-sm font-medium text-gray-900">
-                            {record.nextWeekPlannedWorkNotDone}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="flex gap-2 items-center">
-                          <div className="w-12 h-2 bg-gray-200 rounded-full">
-                            <div
-                              className="h-2 bg-yellow-600 rounded-full"
-                              style={{
-                                width: `${Math.min(
-                                  record.nextWeekPlannedWorkNotDoneOnTime,
-                                  100
-                                )}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <span className="w-8 text-sm font-medium text-gray-900">
-                            {record.nextWeekPlannedWorkNotDoneOnTime}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                            record.commitment >= 95
-                              ? "bg-green-100 text-green-800"
-                              : record.commitment >= 85
-                              ? "bg-yellow-100 text-yellow-800"
-                              : record.commitment >= 75
-                              ? "bg-orange-100 text-orange-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
-                        >
-                          {record.commitment}%
-                        </span>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <div className="text-xs text-gray-600">
-                          <div>{formattedDate}</div>
-                          <div className="text-gray-500">{formattedTime}</div>
-                        </div>
-                      </td>
-                      <td className="px-3 py-4 whitespace-nowrap">
-                        <button
-                          onClick={() => handleDeleteRecord(historyIndex)}
-                          className="text-red-600 transition-colors hover:text-red-900"
-                          title="Delete record"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })
-              ) : (
-                <tr>
-                  <td
-                    colSpan="11"
-                    className="px-3 py-8 text-center text-gray-500"
-                  >
-                    <div className="flex flex-col gap-2 items-center">
-                      <Filter className="w-8 h-8 text-gray-400" />
-                      <span>
-                        No commitment records found for the selected period
-                      </span>
-                    </div>
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Mobile Card View */}
-        <div className="divide-y divide-gray-200 lg:hidden">
-          {filteredHistory.length > 0 ? (
-            filteredHistory.map((record, idx) => {
-              const historyIndex = getHistoryIndex(record);
-              const submittedDate = new Date(record.submittedAt);
-              const formattedDate =
-                submittedDate.toLocaleDateString("en-IN");
-              const formattedTime = submittedDate.toLocaleTimeString(
-                "en-IN",
-                { hour: "2-digit", minute: "2-digit" }
-              );
-
-              return (
-                <div key={idx} className="p-4 bg-white transition-colors hover:bg-gray-50">
-                  <div className="flex justify-between items-start mb-3">
-                    <div className="flex flex-1 gap-3 items-center min-w-0">
-                      <div className="text-sm text-gray-600">
-                        ID: {record.employeeId}
-                      </div>
-                      <div className="text-base font-semibold text-gray-900 truncate">{record.name}</div>
-                      <span className="flex-shrink-0 text-sm text-gray-500">{record.department}</span>
-                    </div>
-                    <button
-                      onClick={() => handleDeleteRecord(historyIndex)}
-                      className="flex-shrink-0 text-red-600 transition-colors hover:text-red-900"
-                      title="Delete record"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                  <div className="space-y-3 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Target:</span>
-                      <span className="font-medium text-gray-900">{record.target}%</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Week Start:</span>
-                      <span className="text-gray-900">{record.dateStart}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Week End:</span>
-                      <span className="text-gray-900">{record.dateEnd}</span>
-                    </div>
-                    <div className="flex justify-between items-center pt-2 border-t border-gray-200">
-                      <span className="text-gray-600">Planned Work Not Done:</span>
-                      <div className="flex flex-1 gap-2 justify-end items-center">
-                        <div className="flex-shrink-0 w-20 h-2 bg-gray-200 rounded-full">
-                          <div
-                            className="h-2 bg-blue-600 rounded-full"
-                            style={{
-                              width: `${Math.min(
-                                record.nextWeekPlannedWorkNotDone,
-                                100
-                              )}%`,
-                            }}
-                          ></div>
-                        </div>
-                        <span className="font-medium text-gray-900 whitespace-nowrap">{record.nextWeekPlannedWorkNotDone}%</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Not Done On Time:</span>
-                      <div className="flex flex-1 gap-2 justify-end items-center">
-                        <div className="flex-shrink-0 w-20 h-2 bg-gray-200 rounded-full">
-                          <div
-                            className="h-2 bg-yellow-600 rounded-full"
-                            style={{
-                              width: `${Math.min(
-                                record.nextWeekPlannedWorkNotDoneOnTime,
-                                100
-                              )}%`,
-                            }}
-                          ></div>
-                        </div>
-                        <span className="font-medium text-gray-900 whitespace-nowrap">{record.nextWeekPlannedWorkNotDoneOnTime}%</span>
-                      </div>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-gray-600">Commitment:</span>
-                      <span
-                        className={`font-semibold px-2 py-1 rounded-full text-xs ${
-                          record.commitment >= 95
-                            ? "bg-green-100 text-green-800"
-                            : record.commitment >= 85
-                            ? "bg-yellow-100 text-yellow-800"
-                            : record.commitment >= 75
-                            ? "bg-orange-100 text-orange-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {record.commitment}%
-                      </span>
-                    </div>
-                    <div className="flex justify-between pt-2 border-t border-gray-200">
-                      <span className="text-gray-600">Submitted:</span>
-                      <div className="text-xs text-right">
-                        <div className="font-medium text-gray-900">{formattedDate}</div>
-                        <div className="text-gray-500">{formattedTime}</div>
-                      </div>
-                    </div>
-                  </div>
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-50">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="h-12 w-12 animate-spin text-blue-600" />
+                    <p className="text-gray-600 font-medium">Loading History...</p>
                 </div>
-              );
-            })
-          ) : (
-            <div className="p-8 text-center text-gray-500">
-              <div className="flex flex-col gap-2 items-center">
-                <Filter className="w-8 h-8 text-gray-400" />
-                <span>
-                  No commitment records found for the selected period
-                </span>
-              </div>
             </div>
-          )}
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-gray-50 p-4 md:p-6 lg:p-8">
+            <div className="max-w-full mx-auto">
+                {/* Page Header */}
+                <div className="mb-5 flex items-center gap-3">
+                    <History className="w-6 h-6 text-blue-600" />
+                    <h1 className="text-xl font-bold text-gray-900">History</h1>
+                    <span className="ml-auto text-sm text-gray-500 bg-white border border-gray-200 rounded px-3 py-1 shadow-sm">
+                        {filteredRecords.length} of {records.length} records
+                    </span>
+                </div>
+
+                {/* Filters */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-5">
+                    <div className="flex flex-col md:flex-row gap-3">
+                        <div className="flex-1 relative">
+                            <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4" />
+                            <input
+                                type="text"
+                                placeholder="Search by name or date..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500"
+                            />
+                        </div>
+                        <div className="w-full md:w-56">
+                            <select
+                                value={dateFilter}
+                                onChange={(e) => setDateFilter(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
+                            >
+                                <option value="all">All Dates</option>
+                                {uniqueDates.map(d => (
+                                    <option key={d} value={d}>{d}</option>
+                                ))}
+                            </select>
+                        </div>
+                        <div className="w-full md:w-56">
+                            <select
+                                value={nameFilter}
+                                onChange={(e) => setNameFilter(e.target.value)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded text-sm focus:outline-none focus:border-blue-500 bg-white"
+                            >
+                                <option value="all">All Names</option>
+                                {uniqueNames.map(n => (
+                                    <option key={n} value={n}>{n}</option>
+                                ))}
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 mb-5">
+                    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                        <p className="text-xs text-gray-500 font-medium uppercase">Total Records</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{records.length}</p>
+                    </div>
+                    <div className="bg-white rounded-lg shadow-sm p-4 border border-gray-200">
+                        <p className="text-xs text-gray-500 font-medium uppercase">Unique Persons</p>
+                        <p className="text-xl font-bold text-gray-900 mt-1">{uniqueNames.length}</p>
+                    </div>
+                </div>
+
+                {/* Table */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+                    <div className="px-5 py-4 border-b border-gray-200 bg-gray-50">
+                        <h2 className="text-base font-bold text-gray-800">Records</h2>
+                    </div>
+                    <div className="overflow-auto max-h-[calc(100vh-320px)] relative border border-gray-200 rounded-lg">
+                        <table className="w-full text-sm border-separate border-spacing-0">
+                            <thead className="bg-gray-50 sticky top-0 z-30 shadow-sm">
+                                <tr>
+                                    <th className="w-12 px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap sticky left-0 top-0 bg-gray-50 z-40 border-b border-gray-200">S.No</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50 border-b border-gray-200">Date Start</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap bg-gray-50 border-b border-gray-200">Date End</th>
+                                    <th className="px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap sticky left-12 top-0 bg-gray-50 z-40 border-l border-b border-gray-200">Name</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">Target</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">Actual Work Done</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">% Work Not Done</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">% Not Done On Time</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">Total Work Done</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">Week Pending</th>
+                                    <th className="px-4 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">All Pending Till Date</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">LW Planned % Not Done</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">LW % Not Done On Time</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-red-100 text-red-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">LW Commitment</th>
+                                    {/* <th className="px-4 py-3 text-center text-xs font-bold bg-gray-100 text-gray-700 uppercase tracking-wider whitespace-nowrap">Link</th> */}
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-green-100 text-green-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">NW Planned % Not Done</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-green-100 text-green-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">NW % Not Done On Time</th>
+                                    <th className="px-4 py-3 text-right text-xs font-bold bg-green-100 text-green-700 uppercase tracking-wider whitespace-nowrap border-b border-gray-200">NW Commitment</th>
+                                </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-100">
+                                {filteredRecords.length > 0 ? (
+                                    filteredRecords.map((r, idx) => (
+                                        <tr key={r.id} className="hover:bg-blue-50/40 transition-colors">
+                                            <td className="px-4 py-3 text-gray-500 font-medium text-center sticky left-0 bg-white z-10">{idx + 1}</td>
+                                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap bg-white">{formatValue(r.dateStart)}</td>
+                                            <td className="px-4 py-3 text-gray-700 whitespace-nowrap bg-white">{formatValue(r.dateEnd)}</td>
+                                            <td className="px-4 py-3 font-semibold text-gray-900 whitespace-nowrap sticky left-12 bg-white z-10 border-l border-gray-200">{formatValue(r.name)}</td>
+                                            <td className="px-4 py-3 text-right text-gray-700">{formatValue(r.target)}</td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800 min-w-[3rem]">
+                                                    {formatValue(r.actualWorkDone)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold min-w-[3rem] ${parseFloat(r.workNotDone) > 30
+                                                    ? "bg-red-100 text-red-800"
+                                                    : parseFloat(r.workNotDone) > 10
+                                                        ? "bg-yellow-100 text-yellow-800"
+                                                        : "bg-green-100 text-green-800"
+                                                    }`}>
+                                                    {formatValue(r.workNotDone)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold min-w-[3rem] ${parseFloat(r.workNotDoneOnTime) > 30
+                                                    ? "bg-red-100 text-red-800"
+                                                    : parseFloat(r.workNotDoneOnTime) > 10
+                                                        ? "bg-yellow-100 text-yellow-800"
+                                                        : "bg-green-100 text-green-800"
+                                                    }`}>
+                                                    {formatValue(r.workNotDoneOnTime)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className="inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold bg-blue-100 text-blue-800 min-w-[3rem]">
+                                                    {formatValue(r.totalWorkDone)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold min-w-[3rem] ${parseFloat(r.weekPending) > 5
+                                                    ? "bg-red-100 text-red-800"
+                                                    : parseFloat(r.weekPending) > 0
+                                                        ? "bg-yellow-100 text-yellow-800"
+                                                        : "bg-green-100 text-green-800"
+                                                    }`}>
+                                                    {formatValue(r.weekPending)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right">
+                                                <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded text-xs font-semibold min-w-[3rem] ${parseFloat(r.allPendingTillDate) > 10
+                                                    ? "bg-red-100 text-red-800"
+                                                    : parseFloat(r.allPendingTillDate) > 3
+                                                        ? "bg-yellow-100 text-yellow-800"
+                                                        : "bg-green-100 text-green-800"
+                                                    }`}>
+                                                    {formatValue(r.allPendingTillDate)}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right bg-red-50/30">
+                                                <span className="text-red-700 font-medium">{formatValue(r.lastWeekPlannedNotDone)}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right bg-red-50/30">
+                                                <span className="text-red-700 font-medium">{formatValue(r.lastWeekPlannedNotDoneOnTime)}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right bg-red-50/30">
+                                                <span className="text-red-700 font-bold">{formatValue(r.lastWeekCommitment)}</span>
+                                            </td>
+                                            {/* <td className="px-4 py-3 text-center bg-gray-50/30">
+                                                {r.linkWithName ? (
+                                                    <a
+                                                        href={r.linkWithName.startsWith('http') ? r.linkWithName : `https://${r.linkWithName}`}
+                                                        target="_blank"
+                                                        rel="noopener noreferrer"
+                                                        className="text-blue-600 hover:text-blue-800 underline font-medium"
+                                                    >
+                                                        View
+                                                    </a>
+                                                ) : "-"}
+                                            </td> */}
+                                            <td className="px-4 py-3 text-right bg-green-50/30">
+                                                <span className="text-green-700 font-medium">{formatValue(r.nextWeekPlannedNotDone)}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right bg-green-50/30">
+                                                <span className="text-green-700 font-medium">{formatValue(r.nextWeekPlannedNotDoneOnTime)}</span>
+                                            </td>
+                                            <td className="px-4 py-3 text-right bg-green-50/30">
+                                                <span className="text-green-700 font-bold">{formatValue(r.nextWeekCommitment)}</span>
+                                            </td>
+                                        </tr>
+                                    ))
+                                ) : (
+                                    <tr>
+                                        <td colSpan="11" className="px-6 py-12 text-center text-gray-400">
+                                            No records found.
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
 };
 
 export default AdminHistoryCommitment;

@@ -6,10 +6,7 @@ import AdminHistoryCommitment from './pages/admin/HistoryCommitment';
 import AdminTodayTasks from './pages/admin/TodayTasks';
 import AdminPendingTasks from './pages/admin/PendingTasks';
 import KpiKra from './pages/admin/KpiKra';
-import UserDashboard from './pages/user/Dashboard';
-import UserKpiKra from './pages/user/KpiKra';
 import AdminLayout from './layouts/AdminLayout';
-import UserLayout from './layouts/UserLayout';
 import NotFound from './pages/NotFound';
 import Report from './pages/admin/Report';
 
@@ -27,20 +24,20 @@ function App() {
 
   return (
     <Routes>
-      <Route 
-        path="/login" 
+      <Route
+        path="/login"
         element={
           user ? (
             <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />
           ) : (
             <Login />
           )
-        } 
+        }
       />
-      
+
       {/* Admin Routes */}
-      <Route 
-        path="/admin/*" 
+      <Route
+        path="/admin/*"
         element={
           <RequireAuth role="admin">
             <AdminLayout />
@@ -55,29 +52,30 @@ function App() {
         <Route path="kpi-kra" element={<KpiKra />} />
         <Route path="department" element={<Report />} />
       </Route>
-      
+
       {/* User Routes */}
-      <Route 
-        path="/user/*" 
+      <Route
+        path="/user/*"
         element={
           <RequireAuth role="user">
-            <UserLayout />
+            <AdminLayout />
           </RequireAuth>
         }
       >
         <Route index element={<Navigate to="/user/dashboard" replace />} />
-        <Route path="dashboard" element={<UserDashboard />} />
-        <Route path="kpi-kra" element={<UserKpiKra />} />
+        <Route path="dashboard" element={<AdminDashboard />} />
+        <Route path="history-commitment" element={<AdminHistoryCommitment />} />
+        <Route path="kpi-kra" element={<KpiKra />} />
       </Route>
-      
+
       {/* Root route */}
-      <Route 
-        path="/" 
+      <Route
+        path="/"
         element={
           <Navigate to={user ? (user.role === 'admin' ? '/admin' : '/user') : '/login'} replace />
-        } 
+        }
       />
-      
+
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
@@ -86,7 +84,7 @@ function App() {
 // Authentication guard component
 function RequireAuth({ children, role }) {
   const { user, loading } = useAuth();
-  
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -94,15 +92,15 @@ function RequireAuth({ children, role }) {
       </div>
     );
   }
-  
+
   if (!user) {
     return <Navigate to="/login" replace />;
   }
-  
+
   if (role && user.role !== role) {
     return <Navigate to={user.role === 'admin' ? '/admin' : '/user'} replace />;
   }
-  
+
   return children;
 }
 
