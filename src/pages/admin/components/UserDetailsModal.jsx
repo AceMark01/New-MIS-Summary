@@ -35,8 +35,8 @@ const UserDetailsModal = ({
     const isOnTimeRow = (row) => {
         const delay = String(row.delay || "").trim();
         const actual = String(row.actual || "").trim();
-        // On Time: actual is filled AND delay is exactly 00:00:00
-        return actual !== "" && delay === "00:00:00";
+        // On Time: actual is filled AND delay is zero, empty, or 00:00:00
+        return actual !== "" && (delay === "00:00:00" || delay === "0" || delay === "00:00" || delay === "");
     };
 
     const isPendingRow = (row) => {
