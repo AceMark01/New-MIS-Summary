@@ -46,8 +46,9 @@ const UserDetailsModal = ({
 
     const isDelayRow = (row) => {
         const delay = String(row.delay || "").trim();
-        // Delay: has a real delay value (not empty, not zero)
-        return delay !== "" && delay !== "00:00:00" && delay !== "0";
+        const actual = String(row.actual || "").trim();
+        // Delay: has a real delay value (not empty, not zero) AND is NOT pending (actual is NOT blank)
+        return actual !== "" && delay !== "" && delay !== "00:00:00" && delay !== "0";
     };
 
     const getRowBg = (row) => {
@@ -247,28 +248,13 @@ const UserDetailsModal = ({
                                     {activeDrillDown.title}
                                 </h3>
                                 <p className="text-xs text-gray-500 truncate">
-                                    {activeDrillDown.taskId}
+                                    {activeDrillDown.taskId} • <span className="font-bold text-blue-600">Total Tasks: {filteredRows.length}</span>
                                 </p>
                             </div>
                             {/* Filters + Close */}
                             <div className="flex items-center gap-2 flex-wrap">
                                 {!activeDrillDown.loading && !activeDrillDown.error && (
                                     <>
-                                        {/* Time Filter */}
-                                        <div className="relative flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
-                                            <Filter className="w-3 h-3 text-gray-400" />
-                                            <select
-                                                value={timeFilter}
-                                                onChange={(e) => setTimeFilter(e.target.value)}
-                                                className="appearance-none bg-transparent text-xs font-semibold text-gray-700 focus:outline-none pr-5 cursor-pointer"
-                                            >
-                                                <option value="all">All Time</option>
-                                                <option value="today">Today</option>
-                                                <option value="week">Last 1 Week</option>
-                                                <option value="month">Last 1 Month</option>
-                                            </select>
-                                            <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 pointer-events-none" />
-                                        </div>
                                         {/* Status Buttons */}
                                         <div className="flex items-center gap-1">
                                             <button onClick={() => setStatusFilter("all")} className={`px-2 py-1 text-xs font-medium rounded transition-all ${statusFilter === "all" ? "bg-gray-800 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>All</button>
