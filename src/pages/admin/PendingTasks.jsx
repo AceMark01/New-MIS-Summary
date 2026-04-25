@@ -77,7 +77,9 @@ const tasks = [
     taskName: 'Frontend Development',
     assignedTo: 'emp-001',
     pendingTaskCount: 5,
-    dueDate: '2025-10-15'
+    dueDate: '2025-10-15',
+    actualDate: '2025-10-15',
+    delayTime: '0000'
   },
   {
     id: 'task-002',
@@ -85,7 +87,9 @@ const tasks = [
     taskName: 'UI Design',
     assignedTo: 'emp-002',
     pendingTaskCount: 3,
-    dueDate: '2025-10-14'
+    dueDate: '2025-10-14',
+    actualDate: '',
+    delayTime: '0000'
   },
   {
     id: 'task-003',
@@ -93,7 +97,9 @@ const tasks = [
     taskName: 'Marketing Campaign',
     assignedTo: 'emp-003',
     pendingTaskCount: 8,
-    dueDate: '2025-10-16'
+    dueDate: '2025-10-16',
+    actualDate: '2025-10-18',
+    delayTime: '02:30'
   },
   {
     id: 'task-004',
@@ -101,7 +107,9 @@ const tasks = [
     taskName: 'Sales Presentation',
     assignedTo: 'emp-004',
     pendingTaskCount: 2,
-    dueDate: '2025-10-13'
+    dueDate: '2025-10-13',
+    actualDate: '',
+    delayTime: '01:15'
   },
   {
     id: 'task-005',
@@ -109,7 +117,9 @@ const tasks = [
     taskName: 'Backend Development',
     assignedTo: 'emp-005',
     pendingTaskCount: 12,
-    dueDate: '2025-10-18'
+    dueDate: '2025-10-18',
+    actualDate: '2025-10-18',
+    delayTime: '0000'
   },
   {
     id: 'task-006',
@@ -117,7 +127,9 @@ const tasks = [
     taskName: 'Quality Assurance',
     assignedTo: 'emp-006',
     pendingTaskCount: 7,
-    dueDate: '2025-10-17'
+    dueDate: '2025-10-17',
+    actualDate: '',
+    delayTime: '0000'
   },
   {
     id: 'task-007',
@@ -125,7 +137,9 @@ const tasks = [
     taskName: 'Documentation',
     assignedTo: 'emp-007',
     pendingTaskCount: 4,
-    dueDate: '2025-10-14'
+    dueDate: '2025-10-14',
+    actualDate: '2025-10-15',
+    delayTime: '00:45'
   },
   {
     id: 'task-008',
@@ -133,7 +147,9 @@ const tasks = [
     taskName: 'HR Process',
     assignedTo: 'emp-008',
     pendingTaskCount: 6,
-    dueDate: '2025-10-15'
+    dueDate: '2025-10-15',
+    actualDate: '2025-10-15',
+    delayTime: '0000'
   },
   {
     id: 'task-009',
@@ -141,7 +157,9 @@ const tasks = [
     taskName: 'Checklist Task-Afroj Begam',
     assignedTo: 'emp-001',
     pendingTaskCount: 15,
-    dueDate: '2025-10-20'
+    dueDate: '2025-10-20',
+    actualDate: '',
+    delayTime: '0000'
   },
   {
     id: 'task-010',
@@ -149,7 +167,9 @@ const tasks = [
     taskName: 'Audit',
     assignedTo: 'emp-002',
     pendingTaskCount: 9,
-    dueDate: '2025-10-19'
+    dueDate: '2025-10-19',
+    actualDate: '2025-10-21',
+    delayTime: '03:00'
   },
   {
     id: 'task-011',
@@ -157,7 +177,9 @@ const tasks = [
     taskName: 'Checklist Task-Amlan Dikshit',
     assignedTo: 'emp-003',
     pendingTaskCount: 11,
-    dueDate: '2025-10-21'
+    dueDate: '2025-10-21',
+    actualDate: '',
+    delayTime: '0000'
   },
   {
     id: 'task-012',
@@ -165,7 +187,9 @@ const tasks = [
     taskName: 'Billing',
     assignedTo: 'emp-004',
     pendingTaskCount: 10,
-    dueDate: '2025-10-16'
+    dueDate: '2025-10-16',
+    actualDate: '2025-10-16',
+    delayTime: '0000'
   }
 ];
 
@@ -173,20 +197,24 @@ const AdminPendingTasks = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [personFilter, setPersonFilter] = useState('all');
   const [fmsFilter, setFmsFilter] = useState('all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [activeDrillDown, setActiveDrillDown] = useState(null);
 
   const handleRowClick = (task) => {
     // Generate dummy data based on count
     const rows = Array.from({ length: task.pendingTaskCount }, (_, i) => {
       const planned = new Date(Date.now() - Math.floor(Math.random() * 10000000000));
-      const actual = new Date(planned.getTime() + Math.floor(Math.random() * 172800000)); // +0-48 hours
+      const hasActual = Math.random() > 0.3;
+      const actual = hasActual ? new Date(planned.getTime() + Math.floor(Math.random() * 172800000)) : null;
+      const isDelay = Math.random() > 0.5;
+      const delay = isDelay ? `${String(Math.floor(Math.random() * 10)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}` : '0000';
 
       return {
         id: `TD-${Math.floor(Math.random() * 10000)}`,
         description: `Pending Task for ${task.taskName} - ${i + 1}`,
         plannedDate: planned.toLocaleDateString(),
-        actualDate: actual.toLocaleDateString(),
-        delayHours: Math.floor(Math.random() * 48)
+        actualDate: actual ? actual.toLocaleDateString() : '',
+        delayTime: delay
       };
     });
 
@@ -238,9 +266,14 @@ const AdminPendingTasks = () => {
       const matchesPerson = personFilter === 'all' || task.personName === personFilter;
       const matchesFMS = fmsFilter === 'all' || task.fmsName === fmsFilter;
 
-      return matchesSearch && matchesPerson && matchesFMS;
+      let matchesStatus = true;
+      if (statusFilter === 'ontime') matchesStatus = task.delayTime === '0000';
+      if (statusFilter === 'pending') matchesStatus = task.actualDate === '';
+      if (statusFilter === 'delay') matchesStatus = task.delayTime !== '0000';
+
+      return matchesSearch && matchesPerson && matchesFMS && matchesStatus;
     });
-  }, [enrichedTasks, searchQuery, personFilter, fmsFilter]);
+  }, [enrichedTasks, searchQuery, personFilter, fmsFilter, statusFilter]);
 
   // Format date
   const formatDate = (dateString) => {
@@ -371,8 +404,34 @@ const AdminPendingTasks = () => {
         {/* Tasks List */}
         <div className="bg-white rounded shadow-sm">
           {/* Section Header */}
-          <div className="px-4 py-3 border-b border-gray-200">
+          <div className="px-4 py-3 border-b border-gray-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
             <h2 className="text-base font-semibold text-gray-700">Pending Tasks</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                onClick={() => setStatusFilter('all')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${statusFilter === 'all' ? 'bg-gray-800 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                All
+              </button>
+              <button
+                onClick={() => setStatusFilter('ontime')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${statusFilter === 'ontime' ? 'bg-green-600 text-white shadow-sm' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+              >
+                On Time
+              </button>
+              <button
+                onClick={() => setStatusFilter('pending')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${statusFilter === 'pending' ? 'bg-red-600 text-white shadow-sm' : 'bg-red-50 text-red-700 hover:bg-red-100'}`}
+              >
+                Pending
+              </button>
+              <button
+                onClick={() => setStatusFilter('delay')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${statusFilter === 'delay' ? 'bg-orange-600 text-white shadow-sm' : 'bg-orange-50 text-orange-700 hover:bg-orange-100'}`}
+              >
+                Delay
+              </button>
+            </div>
           </div>
 
           {filteredTasks.length > 0 ? (
@@ -397,92 +456,136 @@ const AdminPendingTasks = () => {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Due Date
                       </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actual
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Delay
+                      </th>
                       <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Pending Tasks
                       </th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
-                    {filteredTasks.map(task => (
-                      <tr key={task.id} className="hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => handleRowClick(task)}>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-medium text-gray-900">
-                            {task.assignedTo}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="flex items-center">
-                            <img
-                              src={task.personImage}
-                              alt={task.personName}
-                              className="w-8 h-8 rounded-full object-cover mr-3"
-                            />
-                            <span className="text-sm text-gray-900">{task.personName}</span>
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {task.fmsName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                          {task.taskName}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                          {formatDate(task.dueDate)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right">
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                            {task.pendingTaskCount}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredTasks.map(task => {
+                      const isDelay = task.delayTime !== '0000';
+                      const isPending = task.actualDate === '';
+                      const isOnTime = task.delayTime === '0000' && !isPending;
+
+                      let rowBg = 'hover:bg-blue-50';
+                      if (isDelay) rowBg = 'bg-orange-50 hover:bg-orange-100';
+                      else if (isPending) rowBg = 'bg-red-50 hover:bg-red-100';
+                      else if (isOnTime) rowBg = 'bg-green-50 hover:bg-green-100';
+
+                      return (
+                        <tr key={task.id} className={`${rowBg} cursor-pointer transition-colors`} onClick={() => handleRowClick(task)}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {task.assignedTo}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center">
+                              <img
+                                src={task.personImage}
+                                alt={task.personName}
+                                className="w-8 h-8 rounded-full object-cover mr-3"
+                              />
+                              <span className="text-sm text-gray-900">{task.personName}</span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {task.fmsName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {task.taskName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {formatDate(task.dueDate)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                            {task.actualDate || '-'}
+                          </td>
+                          <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium ${isDelay ? 'text-orange-600' : 'text-gray-900'}`}>
+                            {task.delayTime}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-800 shadow-sm">
+                              {task.pendingTaskCount}
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
 
               {/* Mobile Card View */}
               <div className="md:hidden divide-y divide-gray-200">
-                {filteredTasks.map(task => (
-                  <div key={task.id} className="p-4 hover:bg-blue-50 cursor-pointer transition-colors" onClick={() => handleRowClick(task)}>
-                    <div className="flex justify-between items-start mb-3">
-                      <div className="flex items-center flex-1">
-                        <img
-                          src={task.personImage}
-                          alt={task.personName}
-                          className="w-10 h-10 rounded-full object-cover mr-3"
-                        />
-                        <div className="flex-1">
-                          <div className="text-xs text-gray-500 mb-1">
-                            ID: {task.assignedTo}
+                {filteredTasks.map(task => {
+                  const isDelay = task.delayTime !== '0000';
+                  const isPending = task.actualDate === '';
+                  const isOnTime = task.delayTime === '0000' && !isPending;
+
+                  let rowBg = '';
+                  if (isDelay) rowBg = 'bg-orange-50';
+                  else if (isPending) rowBg = 'bg-red-50';
+                  else if (isOnTime) rowBg = 'bg-green-50';
+
+                  return (
+                    <div key={task.id} className={`p-4 ${rowBg} hover:bg-opacity-80 cursor-pointer transition-colors border-b border-gray-100`} onClick={() => handleRowClick(task)}>
+                      <div className="flex justify-between items-start mb-3">
+                        <div className="flex items-center flex-1">
+                          <img
+                            src={task.personImage}
+                            alt={task.personName}
+                            className="w-10 h-10 rounded-full object-cover mr-3"
+                          />
+                          <div className="flex-1">
+                            <div className="text-xs text-gray-500 mb-1">
+                              ID: {task.assignedTo}
+                            </div>
+                            <div className="text-sm font-medium text-gray-900">{task.personName}</div>
                           </div>
-                          <div className="text-xs text-gray-500 mb-1">Link with Name</div>
-                          <div className="text-sm font-medium text-gray-900">{task.personName}</div>
+                        </div>
+                        <div className="ml-4 text-right">
+                          <div className="text-xs text-gray-500 mb-1">Pending</div>
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-white border border-gray-200 text-gray-800">
+                            {task.pendingTaskCount}
+                          </span>
                         </div>
                       </div>
-                      <div className="ml-4 text-right">
-                        <div className="text-xs text-gray-500 mb-1">Pending</div>
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800">
-                          {task.pendingTaskCount}
-                        </span>
+
+                      <div className="grid grid-cols-2 gap-4 mb-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">FMS Name</div>
+                          <div className="text-sm text-gray-900">{task.fmsName}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Task Name</div>
+                          <div className="text-sm text-gray-900">{task.taskName}</div>
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-3 gap-2">
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Due Date</div>
+                          <div className="text-sm text-gray-600">{formatDate(task.dueDate)}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Actual</div>
+                          <div className="text-sm text-gray-900">{task.actualDate || '-'}</div>
+                        </div>
+                        <div>
+                          <div className="text-xs text-gray-500 mb-1">Delay</div>
+                          <div className={`text-sm font-medium ${isDelay ? 'text-orange-600' : 'text-gray-900'}`}>{task.delayTime}</div>
+                        </div>
                       </div>
                     </div>
-
-                    <div className="mb-2">
-                      <div className="text-xs text-gray-500 mb-1">FMS Name</div>
-                      <div className="text-sm text-gray-900">{task.fmsName}</div>
-                    </div>
-
-                    <div className="mb-2">
-                      <div className="text-xs text-gray-500 mb-1">Task Name</div>
-                      <div className="text-sm text-gray-900">{task.taskName}</div>
-                    </div>
-
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Due Date</div>
-                      <div className="text-sm text-gray-600">{formatDate(task.dueDate)}</div>
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </>
           ) : (
@@ -526,23 +629,32 @@ const AdminPendingTasks = () => {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50 sticky top-0">
                   <tr>
-
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Planned</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actual</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delay (Hrs)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Delay</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {activeDrillDown.rows.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-blue-50 transition-colors">
+                  {activeDrillDown.rows.map((row, idx) => {
+                    const isDelay = row.delayTime !== '0000';
+                    const isPending = row.actualDate === '';
+                    const isOnTime = row.delayTime === '0000' && !isPending;
 
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.plannedDate}</td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.actualDate}</td>
-                      <td className="px-6 py-3 whitespace-nowrap text-sm text-red-600 font-medium">
-                        {row.delayHours}h
-                      </td>
-                    </tr>
-                  ))}
+                    let rowBg = '';
+                    if (isDelay) rowBg = 'bg-orange-50';
+                    else if (isPending) rowBg = 'bg-red-50';
+                    else if (isOnTime) rowBg = 'bg-green-50';
+
+                    return (
+                      <tr key={idx} className={`${rowBg} hover:bg-opacity-80 transition-colors`}>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.plannedDate}</td>
+                        <td className="px-6 py-3 whitespace-nowrap text-sm text-gray-500">{row.actualDate || '-'}</td>
+                        <td className={`px-6 py-3 whitespace-nowrap text-sm font-medium ${isDelay ? 'text-orange-600' : 'text-gray-900'}`}>
+                          {row.delayTime}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>

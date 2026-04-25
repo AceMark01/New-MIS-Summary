@@ -1,5 +1,5 @@
 import React from "react";
-import { Filter, ChevronDown, Loader2 } from "lucide-react";
+import { Filter, ChevronDown, Loader2, MessageSquare } from "lucide-react";
 
 const EmployeeListSection = ({
     // Column visibility
@@ -17,9 +17,11 @@ const EmployeeListSection = ({
     setFilterDepartment,
     uniqueDesignations,
     // Submit
-    handleSubmit,
+    onMainSubmit,
+    onWhatsAppSubmit,
     selectedEmployees,
-    submitting,
+    mainSubmitting,
+    whatsappSubmitting,
     // Table data
     loading,
     filteredEmployees,
@@ -47,25 +49,49 @@ const EmployeeListSection = ({
                         <h2 className="text-base md:text-lg font-semibold text-gray-800">
                             List of People
                         </h2>
-                        {selectedEmployees.length > 0 && (
-                            <button
-                                onClick={handleSubmit}
-                                disabled={submitting}
-                                className={`inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white transition-all transform active:scale-95 ${submitting
-                                    ? "bg-blue-400 cursor-not-allowed"
-                                    : "bg-blue-600 hover:bg-blue-700"
-                                    }`}
-                            >
-                                {submitting ? (
-                                    <>
-                                        <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                                        Submitting...
-                                    </>
-                                ) : (
-                                    "Submit Selection"
-                                )}
-                            </button>
-                        )}
+                        <div className="flex items-center gap-2">
+                            {selectedEmployees.length > 0 && (
+                                <>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onWhatsAppSubmit(e);
+                                        }}
+                                        disabled={whatsappSubmitting || mainSubmitting}
+                                        className="inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white bg-[#25D366] hover:bg-[#128C7E] transition-all transform active:scale-95 disabled:bg-green-300 disabled:cursor-not-allowed"
+                                    >
+                                        {whatsappSubmitting ? (
+                                            <Loader2 className="animate-spin h-4 w-4" />
+                                        ) : (
+                                            <>
+                                                <MessageSquare className="h-4 w-4 mr-2" />
+                                                WhatsApp
+                                            </>
+                                        )}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onMainSubmit(e);
+                                        }}
+                                        disabled={whatsappSubmitting || mainSubmitting}
+                                        className={`inline-flex items-center px-4 py-2 rounded-md shadow-sm text-sm font-medium text-white transition-all transform active:scale-95 ${mainSubmitting ? "bg-blue-400 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"
+                                            }`}
+                                    >
+                                        {mainSubmitting ? (
+                                            <>
+                                                <Loader2 className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                                                Submitting...
+                                            </>
+                                        ) : (
+                                            "Submit Selection"
+                                        )}
+                                    </button>
+                                </>
+                            )}
+                        </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 md:gap-3">

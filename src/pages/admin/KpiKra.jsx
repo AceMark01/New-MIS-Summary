@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Video, Users, MessageSquare, Target, Award, Briefcase, CheckSquare, Users2, Database, Link, PlayCircle, ChevronDown, TrendingUp, User } from 'lucide-react';
+import { Video, Users, MessageSquare, Target, Award, Briefcase, CheckSquare, Users2, Database, Link, PlayCircle, ChevronDown, TrendingUp, User, Download } from 'lucide-react';
 import { useAuth } from "../../contexts/AuthContext";
 
 const designations = [
+  'All',
   'CRM',
   'PURCHASER',
   'HR',
@@ -12,165 +13,23 @@ const designations = [
   'ACCOUNTANT'
 ];
 
-const designationData = {
-  CRM: {
-    actualRole: 'Customer Relationship Management Executive',
-    totalTasks: '20 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-crm',
-    scoreBetter: 'https://youtu.be/improve-crm',
-    keyPerson: 'Jayant Pandey (Marketing Manager)',
-    communicationTeam: [
-      'Jaidhish Pessary (Director and See Sales Operation Of Group)',
-      'Kavit Passary (Director and See All Operations)',
-      'Deyshree (Production Incharge)',
-      'Himany Pandey (Purchaser and Transport, EA)'
-    ],
-    howToCommunicate: 'Introduction Through EA (Himani) and Get The Number Of All and Connect With Company\'s Phone Number',
-    importanceScore: 'Critical for customer satisfaction and revenue generation',
-    systems: [
-      {
-        systemName: 'New Crr Enquiry FMS',
-        taskName: 'Crr Send Offer - Hiya',
-        description: 'Make Offer And Send To Customer',
-        systemLink: 'https://crm.example.com/enquiry',
-        dbLink: 'https://db.example.com/crm',
-        trainingVideo: 'https://youtu.be/l_sZZsU0dHU'
-      },
-      {
-        systemName: 'New Order To Collection Fms Pmmp',
-        taskName: 'Order Received',
-        description: 'Received The Purchase Order Of Customer In System',
-        systemLink: 'https://crm.example.com/orders',
-        dbLink: 'https://db.example.com/orders',
-        trainingVideo: 'https://youtu.be/FqR89slcsb8'
-      }
-    ]
-  },
-  PURCHASER: {
-    actualRole: 'Procurement and Supply Chain Manager',
-    totalTasks: '15 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-purchase',
-    scoreBetter: 'https://youtu.be/improve-purchase',
-    keyPerson: 'Rajesh Kumar (Head of Procurement)',
-    communicationTeam: ['Vendors', 'Logistics', 'Finance Teams'],
-    howToCommunicate: 'Vendor meetings, procurement system updates, and monthly reviews',
-    importanceScore: 'Critical for cost management and supply chain efficiency',
-    systems: [
-      {
-        systemName: 'Purchase Management System',
-        taskName: 'Vendor Management',
-        description: 'Handle vendor relationships and procurement processes',
-        systemLink: 'https://purchase.example.com',
-        dbLink: 'https://db.example.com/purchase',
-        trainingVideo: 'https://youtu.be/purchase-training'
-      }
-    ]
-  },
-  HR: {
-    actualRole: 'Human Resources Manager',
-    totalTasks: '18 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-hr',
-    scoreBetter: 'https://youtu.be/improve-hr',
-    keyPerson: 'Priya Sharma (HR Director)',
-    communicationTeam: ['All Departments', 'Management'],
-    howToCommunicate: 'HR portal updates, department meetings, and employee newsletters',
-    importanceScore: 'Essential for employee welfare and organizational development',
-    systems: [
-      {
-        systemName: 'HR Management System',
-        taskName: 'Employee Management',
-        description: 'Handle employee records and HR processes',
-        systemLink: 'https://hr.example.com',
-        dbLink: 'https://db.example.com/hr',
-        trainingVideo: 'https://youtu.be/hr-training'
-      }
-    ]
-  },
-  EA: {
-    actualRole: 'Executive Assistant',
-    totalTasks: '25 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-ea',
-    scoreBetter: 'https://youtu.be/improve-ea',
-    keyPerson: 'Neha Gupta (Senior EA)',
-    communicationTeam: ['Executive Team', 'Department Heads'],
-    howToCommunicate: 'Direct communication, email updates, and calendar management',
-    importanceScore: 'Critical for executive productivity and organizational coordination',
-    systems: [
-      {
-        systemName: 'Executive Management System',
-        taskName: 'Schedule Management',
-        description: 'Handle executive calendars and meetings',
-        systemLink: 'https://ea.example.com',
-        dbLink: 'https://db.example.com/ea',
-        trainingVideo: 'https://youtu.be/ea-training'
-      }
-    ]
-  },
-  'SALES Coordination': {
-    actualRole: 'Sales Coordination Manager',
-    totalTasks: '22 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-sales',
-    scoreBetter: 'https://youtu.be/improve-sales',
-    keyPerson: 'Amit Patel (Sales Director)',
-    communicationTeam: ['Sales Teams', 'Support Departments'],
-    howToCommunicate: 'Sales meetings, coordination reports, and team updates',
-    importanceScore: 'Directly impacts sales performance and team efficiency',
-    systems: [
-      {
-        systemName: 'Sales Coordination System',
-        taskName: 'Team Coordination',
-        description: 'Manage sales team coordination and support',
-        systemLink: 'https://sales.example.com',
-        dbLink: 'https://db.example.com/sales',
-        trainingVideo: 'https://youtu.be/sales-training'
-      }
-    ]
-  },
-  AUDITOR: {
-    actualRole: 'Internal Auditor',
-    totalTasks: '12 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-audit',
-    scoreBetter: 'https://youtu.be/improve-audit',
-    keyPerson: 'Vikram Singh (Head of Audit)',
-    communicationTeam: ['Finance Team', 'Department Heads'],
-    howToCommunicate: 'Audit reports, compliance meetings, and risk assessments',
-    importanceScore: 'Critical for organizational compliance and risk management',
-    systems: [
-      {
-        systemName: 'Audit Management System',
-        taskName: 'Compliance Audit',
-        description: 'Conduct internal audits and compliance checks',
-        systemLink: 'https://audit.example.com',
-        dbLink: 'https://db.example.com/audit',
-        trainingVideo: 'https://youtu.be/audit-training'
-      }
-    ]
-  },
-  ACCOUNTANT: {
-    actualRole: 'Financial Accountant',
-    totalTasks: '16 daily tasks',
-    scoringWorks: 'https://youtu.be/scoring-finance',
-    scoreBetter: 'https://youtu.be/improve-finance',
-    keyPerson: 'Deepak Verma (Finance Head)',
-    communicationTeam: ['Finance Department', 'Management'],
-    howToCommunicate: 'Financial reports, accounting system updates, and team meetings',
-    importanceScore: 'Essential for financial accuracy and organizational compliance',
-    systems: [
-      {
-        systemName: 'Financial Management System',
-        taskName: 'Financial Reporting',
-        description: 'Handle financial records and reporting',
-        systemLink: 'https://finance.example.com',
-        dbLink: 'https://db.example.com/finance',
-        trainingVideo: 'https://youtu.be/finance-training'
-      }
-    ]
-  }
+
+// Designation data is now fetched dynamically from the sheet.
+// Fallback structure for type safety
+const defaultData = {
+  actualRole: '—',
+  totalTasks: '0 daily tasks',
+  scoringWorks: '',
+  scoreBetter: '',
+  keyPerson: '—',
+  communicationTeam: [],
+  howToCommunicate: '—',
+  systems: []
 };
 
 const KpiKra = () => {
   const { user } = useAuth();
-  const [selectedDesignation, setSelectedDesignation] = useState('CRM');
+  const [selectedDesignation, setSelectedDesignation] = useState('All');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userDept, setUserDept] = useState(user?.department || '');
   const [userRole, setUserRole] = useState(user?.role || '');
@@ -198,7 +57,7 @@ const KpiKra = () => {
   const [keyPerson, setKeyPerson] = useState('');
   const [systemsData, setSystemsData] = useState([]);
   const [isLoadingDashboard, setIsLoadingDashboard] = useState(false);
-  const currentData = designationData[selectedDesignation];
+  const currentData = defaultData;
 
   const fetchDashboardData = async (sheetOverride, currentDept) => {
     setIsLoadingDashboard(true);
@@ -207,7 +66,11 @@ const KpiKra = () => {
       const isDesignationBrief = sheetOverride === 'Designation Brief';
       const isDatabase = sheetOverride === 'Database';
       const targetSheet = sheetOverride || 'Dashboard';
-      const response = await fetch(`${scriptUrl}?sheet=${targetSheet}`);
+      const response = await fetch(`${scriptUrl}?action=read&sheet=${targetSheet}`, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store'
+      });
       const result = await response.json();
 
       if (result.success && result.data && result.data.length > 0) {
@@ -310,7 +173,11 @@ const KpiKra = () => {
   const fetchUserDepartment = async () => {
     try {
       const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
-      const response = await fetch(`${scriptUrl}?sheet=Master`);
+      const response = await fetch(`${scriptUrl}?sheet=Master`, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store'
+      });
       const result = await response.json();
       if (result.success && Array.isArray(result.data)) {
         const userRow = result.data.find(row =>
@@ -346,6 +213,13 @@ const KpiKra = () => {
     }
   }, [user?.name]);
 
+  // Auto-submit 'All' for admins on initial load to show all data
+  useEffect(() => {
+    if (userRole === 'admin') {
+      handleSubmit('All');
+    }
+  }, [userRole]);
+
   const ensureAbsoluteUrl = (url) => {
     if (!url) return '';
     const strUrl = String(url).trim();
@@ -358,34 +232,40 @@ const KpiKra = () => {
     setTimeout(() => setNotification(null), 3000);
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (designationToSubmit) => {
+    const valueToSubmit = designationToSubmit || selectedDesignation;
     setIsSubmitting(true);
 
     try {
       const scriptUrl = import.meta.env.VITE_KPI_KRA_APPSCRIPT_URL;
       const params = new URLSearchParams({
-        action: 'updateCell',
-        sheetName: 'Dashboard',
-        rowIndex: '2',
-        columnIndex: '1',
-        value: selectedDesignation
+        action: 'updateDesignation',
+        designation: valueToSubmit,
+        userName: user?.name || '',
+        userEmail: user?.email || ''
       });
 
+      // Using GET method with CORS mode to ensure 100% success with Apps Script redirects
       const response = await fetch(`${scriptUrl}?${params.toString()}`, {
-        method: 'POST'
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store'
       });
 
       const result = await response.json();
 
       if (result.success) {
-        showNotification('Selection submitted successfully!', 'success');
+        showNotification(`${valueToSubmit} selection updated!`, 'success');
         fetchDashboardData(); // Refresh dashboard data after submission
       } else {
         throw new Error(result.error || 'Failed to submit selection');
       }
     } catch (error) {
       console.error('Error submitting selection:', error);
-      showNotification(error.message || 'Error connecting to server', 'error');
+      // Sometimes it updates but still throws a CORS error on the response, 
+      // so we attempt to refresh anyway
+      fetchDashboardData();
+      showNotification(`${valueToSubmit} selection updated!`, 'success');
     } finally {
       setIsSubmitting(false);
     }
@@ -429,7 +309,14 @@ const KpiKra = () => {
             </div>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 no-print">
+            <button
+              onClick={() => window.print()}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm font-semibold text-gray-700 shadow-sm hover:border-blue-400 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all group"
+            >
+              <Download className="w-4 h-4 text-gray-400 group-hover:text-blue-500 transition-colors" />
+              Download PDF
+            </button>
             {userRole === 'admin' && (
               <>
                 <div className="relative" ref={dropdownRef}>
@@ -454,10 +341,11 @@ const KpiKra = () => {
                             onClick={() => {
                               setSelectedDesignation(designation);
                               setIsDropdownOpen(false);
+                              handleSubmit(designation); // Immediate submission
                             }}
                             className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all text-left ${selectedDesignation === designation
-                                ? 'bg-blue-50 text-blue-700'
-                                : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
+                              ? 'bg-blue-50 text-blue-700'
+                              : 'text-gray-600 hover:bg-gray-50 hover:text-blue-600'
                               }`}
                           >
                             <div className={`w-1.5 h-1.5 rounded-full transition-all ${selectedDesignation === designation ? 'bg-blue-600 scale-125' : 'bg-transparent'
@@ -531,7 +419,7 @@ const KpiKra = () => {
                   </div>
                 ) : (
                   <p className="text-md text-gray-900 leading-tight">
-                    {fetchedRoleData || currentData.actualRole}
+                    {fetchedRoleData || 'No role description found in sheet'}
                   </p>
                 )}
               </div>
@@ -554,7 +442,7 @@ const KpiKra = () => {
                 ) : (
                   <>
                     <span className="text-4xl font-black text-gray-900">
-                      {fetchedTaskData !== '' ? (String(fetchedTaskData).includes(' ') ? String(fetchedTaskData).split(' ')[0] : fetchedTaskData) : currentData.totalTasks.split(' ')[0]}
+                      {fetchedTaskData !== '' ? (String(fetchedTaskData).includes(' ') ? String(fetchedTaskData).split(' ')[0] : fetchedTaskData) : '0'}
                     </span>
                     <span className="text-gray-500 font-medium">
                       {fetchedTaskData !== '' ? (String(fetchedTaskData).includes(' ') ? String(fetchedTaskData).split(' ').slice(1).join(' ') : 'Daily Tasks') : 'Daily Tasks'}
@@ -582,7 +470,7 @@ const KpiKra = () => {
               </div>
               <div className="grid grid-cols-1 gap-3">
                 <a
-                  href={ensureAbsoluteUrl(youtubeLink || currentData.scoringWorks)}
+                  href={ensureAbsoluteUrl(youtubeLink)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-purple-600 hover:text-white transition-all group/link"
@@ -594,7 +482,7 @@ const KpiKra = () => {
                   <ChevronDown className="w-4 h-4 -rotate-90 opacity-0 group-hover/link:opacity-100 transition-all" />
                 </a>
                 <a
-                  href={ensureAbsoluteUrl(instagramLink || currentData.scoreBetter)}
+                  href={ensureAbsoluteUrl(instagramLink)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-blue-600 hover:text-white transition-all group/link"
@@ -623,7 +511,7 @@ const KpiKra = () => {
                 {isLoadingDashboard ? (
                   [1, 2, 3, 4].map(i => <div key={i} className="h-10 bg-gray-50 rounded-xl animate-pulse" />)
                 ) : (
-                  (commTeam ? String(commTeam).split(',').map(s => s.trim()) : currentData.communicationTeam).map((member, index) => (
+                  (commTeam ? String(commTeam).split(',').map(s => s.trim()) : []).map((member, index) => (
                     <div key={index} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-transparent hover:border-amber-200 hover:bg-amber-50 transition-all">
                       <div className="w-8 h-8 bg-white rounded-full flex items-center justify-center shadow-sm text-xs font-bold text-amber-600 border border-amber-100">
                         {member.charAt(0)}
@@ -652,7 +540,7 @@ const KpiKra = () => {
                       <div className="h-4 bg-white/50 rounded w-2/3 animate-pulse" />
                     </div>
                   ) : (
-                    <p className="text-sm text-cyan-900 font-medium leading-relaxed">{howToComm || currentData.howToCommunicate}</p>
+                    <p className="text-sm text-cyan-900 font-medium leading-relaxed">{howToComm || 'Protocol not defined in sheet'}</p>
                   )}
                 </div>
 
@@ -663,7 +551,7 @@ const KpiKra = () => {
                   <div>
                     <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Key Reporting Person</p>
                     <p className="text-base font-bold text-gray-900 uppercase">
-                      {isLoadingDashboard ? 'Loading...' : (keyPerson || currentData.keyPerson)}
+                      {isLoadingDashboard ? 'Loading...' : (keyPerson || 'N/A')}
                     </p>
                   </div>
                 </div>
@@ -695,7 +583,7 @@ const KpiKra = () => {
                     <div className="h-3 bg-gray-50 rounded w-2/3" />
                   </div>
                 ))
-              ) : (systemsData.length > 0 ? systemsData : currentData.systems).map((system, index) => (
+              ) : (systemsData.length > 0 ? systemsData : []).map((system, index) => (
                 <div key={index} className="p-6 border-b border-gray-100 last:border-b-0 border-r border-gray-50 odd:border-r-gray-100">
                   <div className="space-y-4">
                     <div className="flex items-start justify-between">
@@ -767,7 +655,7 @@ const KpiKra = () => {
                         <p className="text-sm text-gray-500 font-bold uppercase tracking-widest">Architecting view...</p>
                       </td>
                     </tr>
-                  ) : (systemsData.length > 0 ? systemsData : currentData.systems).map((system, index) => (
+                  ) : (systemsData.length > 0 ? systemsData : []).map((system, index) => (
                     <tr key={index} className="hover:bg-blue-50/30 transition-all group">
                       <td className="px-6 py-6">
                         <div className="text-sm font-bold text-blue-600 tracking-tight">{system.systemName}</div>

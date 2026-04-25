@@ -10,6 +10,7 @@ const UserDetailsModal = ({
     handleDrillDown,
 }) => {
     const [timeFilter, setTimeFilter] = React.useState("all");
+    const [statusFilter, setStatusFilter] = React.useState("all");
 
     const parseDate = (dateStr) => {
         if (!dateStr) return null;
@@ -31,14 +32,49 @@ const UserDetailsModal = ({
         return new Date(year, month, day);
     };
 
+    const isOnTimeRow = (row) => {
+        const delay = String(row.delay || "").trim();
+        const actual = String(row.actual || "").trim();
+        // On Time: actual is filled AND delay is exactly 00:00:00
+        return actual !== "" && delay === "00:00:00";
+    };
+
+    const isPendingRow = (row) => {
+        const actual = String(row.actual || "").trim();
+        return actual === "";
+    };
+
+    const isDelayRow = (row) => {
+        const delay = String(row.delay || "").trim();
+        // Delay: has a real delay value (not empty, not zero)
+        return delay !== "" && delay !== "00:00:00" && delay !== "0";
+    };
+
+    const getRowBg = (row) => {
+        // Pending (actual blank) takes highest priority — even if delay exists
+        if (isPendingRow(row)) return "bg-rose-100 hover:bg-rose-200";
+        if (isDelayRow(row)) return "bg-orange-100 hover:bg-orange-200";
+        if (isOnTimeRow(row)) return "bg-green-100 hover:bg-green-200";
+        return "hover:bg-gray-50";
+    };
+
     const filteredRows = React.useMemo(() => {
         if (!activeDrillDown || !activeDrillDown.rows) return [];
-        if (timeFilter === "all") return activeDrillDown.rows;
+
+        let rows = activeDrillDown.rows;
+
+        // Status filter
+        if (statusFilter === "ontime") rows = rows.filter(isOnTimeRow);
+        else if (statusFilter === "pending") rows = rows.filter(isPendingRow);
+        else if (statusFilter === "delay") rows = rows.filter(isDelayRow);
+
+        // Time filter
+        if (timeFilter === "all") return rows;
 
         const now = new Date();
         const todayAtMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-        return activeDrillDown.rows.filter(row => {
+        return rows.filter(row => {
             const rowDate = parseDate(row.actual) || parseDate(row.planned);
             if (!rowDate) return false;
 
@@ -53,7 +89,7 @@ const UserDetailsModal = ({
             }
             return true;
         });
-    }, [activeDrillDown, timeFilter]);
+    }, [activeDrillDown, timeFilter, statusFilter]);
 
     return (
         <>
@@ -204,41 +240,50 @@ const UserDetailsModal = ({
             {activeDrillDown && ReactDOM.createPortal(
                 <div className="fixed inset-0 bg-black/25 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col animate-fadeIn border-2 border-gray-100">
-                        <div className="flex justify-between items-center p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-                            <div className="flex items-center gap-4">
-                                <div>
-                                    <h3 className="text-lg font-bold text-gray-900">
-                                        {activeDrillDown.title}
-                                    </h3>
-                                    <p className="text-sm text-gray-500">
-                                        {activeDrillDown.taskId}
-                                    </p>
-                                </div>
-                                {!activeDrillDown.loading && !activeDrillDown.error && (
-                                    <div className="relative flex items-center gap-2 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm ml-4">
-                                        <Filter className="w-3.5 h-3.5 text-gray-400" />
-                                        <select
-                                            value={timeFilter}
-                                            onChange={(e) => setTimeFilter(e.target.value)}
-                                            className="appearance-none bg-transparent text-xs font-semibold text-gray-700 focus:outline-none pr-6 cursor-pointer"
-                                        >
-                                            <option value="all">All Time</option>
-                                            <option value="today">Today</option>
-                                            <option value="week">Last 1 Week</option>
-                                            <option value="month">Last 1 Month</option>
-                                        </select>
-                                        <ChevronDown className="w-3 h-3 text-gray-400 absolute right-2 pointer-events-none" />
-                                    </div>
-                                )}
+                        <div className="flex items-center justify-between gap-2 p-4 border-b border-gray-200 bg-gray-50 rounded-t-lg flex-wrap">
+                            {/* Title */}
+                            <div className="min-w-0">
+                                <h3 className="text-base font-bold text-gray-900 leading-tight">
+                                    {activeDrillDown.title}
+                                </h3>
+                                <p className="text-xs text-gray-500 truncate">
+                                    {activeDrillDown.taskId}
+                                </p>
                             </div>
-                            <button
-                                onClick={() => setActiveDrillDown(null)}
-                                className="p-1 hover:bg-gray-200 rounded-full transition-colors"
-                            >
-                                <X className="w-5 h-5 text-gray-500" />
-                            </button>
+                            {/* Filters + Close */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                                {!activeDrillDown.loading && !activeDrillDown.error && (
+                                    <>
+                                        {/* Time Filter */}
+                                        <div className="relative flex items-center gap-1 bg-white border border-gray-200 rounded-lg px-2 py-1 shadow-sm">
+                                            <Filter className="w-3 h-3 text-gray-400" />
+                                            <select
+                                                value={timeFilter}
+                                                onChange={(e) => setTimeFilter(e.target.value)}
+                                                className="appearance-none bg-transparent text-xs font-semibold text-gray-700 focus:outline-none pr-5 cursor-pointer"
+                                            >
+                                                <option value="all">All Time</option>
+                                                <option value="today">Today</option>
+                                                <option value="week">Last 1 Week</option>
+                                                <option value="month">Last 1 Month</option>
+                                            </select>
+                                            <ChevronDown className="w-3 h-3 text-gray-400 absolute right-1.5 pointer-events-none" />
+                                        </div>
+                                        {/* Status Buttons */}
+                                        <div className="flex items-center gap-1">
+                                            <button onClick={() => setStatusFilter("all")} className={`px-2 py-1 text-xs font-medium rounded transition-all ${statusFilter === "all" ? "bg-gray-800 text-white" : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-100"}`}>All</button>
+                                            <button onClick={() => setStatusFilter("ontime")} className={`px-2 py-1 text-xs font-medium rounded transition-all ${statusFilter === "ontime" ? "bg-green-600 text-white" : "bg-green-50 text-green-700 hover:bg-green-100"}`}>On Time</button>
+                                            <button onClick={() => setStatusFilter("pending")} className={`px-2 py-1 text-xs font-medium rounded transition-all ${statusFilter === "pending" ? "bg-rose-600 text-white" : "bg-rose-50 text-rose-700 hover:bg-rose-100"}`}>Pending</button>
+                                            <button onClick={() => setStatusFilter("delay")} className={`px-2 py-1 text-xs font-medium rounded transition-all ${statusFilter === "delay" ? "bg-orange-600 text-white" : "bg-orange-50 text-orange-700 hover:bg-orange-100"}`}>Delay</button>
+                                        </div>
+                                    </>
+                                )}
+                                {/* Close Button */}
+                                <button onClick={() => setActiveDrillDown(null)} className="p-1 hover:bg-gray-200 rounded-full transition-colors ml-1">
+                                    <X className="w-4 h-4 text-gray-500" />
+                                </button>
+                            </div>
                         </div>
-
                         <div className="overflow-y-auto flex-1">
                             {activeDrillDown.loading ? (
                                 <div className="flex flex-col items-center justify-center py-10 space-y-3">
@@ -265,11 +310,11 @@ const UserDetailsModal = ({
                                             <tbody className="bg-white divide-y divide-gray-200">
                                                 {filteredRows && filteredRows.length > 0 ? (
                                                     filteredRows.map((row, idx) => (
-                                                        <tr key={idx} className="hover:bg-blue-50 transition-colors">
+                                                        <tr key={idx} className={`${getRowBg(row)} transition-colors`}>
                                                             <td className="px-4 py-3 text-sm text-gray-700">{row.taskName}</td>
                                                             <td className="px-4 py-3 text-sm text-gray-700">{row.planned}</td>
-                                                            <td className="px-4 py-3 text-sm text-gray-700">{row.actual}</td>
-                                                            <td className="px-4 py-3 text-sm text-gray-700">{row.delay}</td>
+                                                            <td className="px-4 py-3 text-sm text-gray-500">{row.actual || '-'}</td>
+                                                            <td className={`px-4 py-3 text-sm font-medium ${isDelayRow(row) ? 'text-orange-600' : 'text-gray-700'}`}>{row.delay || '00:00:00'}</td>
                                                         </tr>
                                                     ))
                                                 ) : (

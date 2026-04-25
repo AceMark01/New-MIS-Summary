@@ -79,6 +79,21 @@ export const generateDashboardJPEG = async (visibleColumnsList, filteredEmployee
         </td>
       </tr>
     </table>
+    
+    <!-- Performance Analytics Chart Section -->
+    <div style="margin-bottom: 30px; background-color: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px;">
+      <h2 style="font-size: 20px; font-weight: bold; color: #374151; margin: 0 0 15px 0;">
+        <span style="display: inline-block; width: 6px; height: 20px; background-color: #2563eb; border-radius: 3px; margin-right: 10px; vertical-align: middle;"></span>
+        Performance Analytics Graph
+      </h2>
+      <div style="width: 100%; height: 350px; background-color: #f9fafb; border-radius: 8px; overflow: hidden; display: flex; align-items: center; justify-content: center;">
+        <img 
+          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTO2wI31pXL9u9z_BmFSXomz2KWYoGRq687oTZL-PqltVhtQzqMVWTwtrfen7UbtitCDzNwRla0sWDZ/pubchart?oid=1932717403&format=image" 
+          style="max-width: 100%; max-height: 100%; object-fit: contain;"
+          alt="Performance Graph"
+        />
+      </div>
+    </div>
 
     <!-- Department Performance Section -->
     <div style="margin-bottom: 20px; background-color: white;">

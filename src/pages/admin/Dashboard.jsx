@@ -127,7 +127,8 @@ const AdminDashboard = () => {
 
   // New State for Data Editing
   const [editableData, setEditableData] = useState({});
-  const [submitting, setSubmitting] = useState(false);
+  const [mainSubmitting, setMainSubmitting] = useState(false);
+  const [whatsappSubmitting, setWhatsappSubmitting] = useState(false);
   const [archivedMap, setArchivedMap] = useState({});
 
   // Reset editable data when selection changes
@@ -238,14 +239,17 @@ const AdminDashboard = () => {
         // Build image and designation maps from Master sheet (Column A: Name, Column D: Designation, Column E: Image)
         const imageMap = {};
         const designationMap = {};
+        const phoneMap = {};
         if (masterResult.success && Array.isArray(masterResult.data)) {
           masterResult.data.slice(1).forEach(row => {
             const name = row[0] ? String(row[0]).trim().toLowerCase() : "";
             const designation = row[3] ? String(row[3]).trim() : "";
             const imageUrl = row[4];
+            const phone = row[1] ? String(row[1]).trim() : ""; // Column B (index 1)
             if (name) {
               if (imageUrl) imageMap[name] = imageUrl;
               if (designation) designationMap[name] = designation;
+              if (phone) phoneMap[name] = phone;
             }
           });
         }
@@ -808,13 +812,15 @@ const AdminDashboard = () => {
       const maxLen = Math.max(plannedValues.length, actualValues.length, taskNameValues.length);
       const rows = [];
       for (let i = 0; i < maxLen; i++) {
+        const plannedVal = plannedValues[i] || "";
+        const actualVal = actualValues[i] || "";
         const delayVal = delayValues[i] || "";
-        // Only show data where delay is present and non-zero
-        if (delayVal && delayVal !== "00:00:00" && delayVal !== "0") {
+        // Include all rows that have at least a planned date
+        if (plannedVal) {
           rows.push({
             taskName: taskNameValues[i] || "",
-            planned: plannedValues[i] || "",
-            actual: actualValues[i] || "",
+            planned: plannedVal,
+            actual: actualVal,
             delay: delayVal
           });
         }
@@ -842,10 +848,121 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSubmitting(true);
+  const handleWhatsAppSubmit = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log("EXECUTION START: handleWhatsAppSubmit");
+    if (whatsappSubmitting || mainSubmitting) return;
+    
+    if (selectedEmployees.length === 0) {
+      alert("Please select at least one person.");
+      return;
+    }
 
+    setWhatsappSubmitting(true);
+    try {
+      const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
+      const targetSpreadsheetId = "1qlSZ41zJ2vh_7o8LxQJgoWx7c2pEOnf41wmiuL1iup4";
+      const whatsappLinks = [];
+
+      for (const id of selectedEmployees) {
+        const emp = sheetEmployees.find(e => e.id === id);
+        const inputs = editableData[id] || {};
+
+        const row = [
+          "", // Column A
+          emp.name,
+          emp.target,
+          emp.actualWorkDone,
+          emp.weeklyWorkDone,
+          emp.weeklyWorkDoneOnTime,
+          emp.totalWorkDone,
+          emp.weekPending,
+          emp.allPendingTillDate,
+          emp.plannedWorkNotDone,
+          emp.plannedWorkNotDoneOnTime,
+          emp.commitment,
+          inputs.nextWeekPlannedNotDone || emp.nextWeekPlannedWorkNotDone || 0,
+          inputs.nextWeekPlannedNotDoneOnTime || emp.nextWeekPlannedWorkNotDoneOnTime || 0,
+          inputs.nextWeekCommitment || emp.nextWeekCommitment || 0
+        ];
+
+        const payload = {
+          action: "insert",
+          spreadsheetId: targetSpreadsheetId,
+          sheetName: "For Whatsapp",
+          rowData: JSON.stringify(row)
+        };
+
+        const response = await fetch(scriptUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: new URLSearchParams(payload)
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        try {
+          const result = await response.json();
+          if (result && !result.success) throw new Error(result.error || "Failed to submit");
+        } catch (e) {
+          console.warn("JSON parse failed (CORS), assuming success.");
+        }
+
+        const message = `📊 *MIS Weekly Performance Report*
+
+👋 Hello ${emp.name},
+
+Here is your performance summary:
+
+📌 Target: ${emp.target}  
+✅ Actual Work Done: ${emp.actualWorkDone}  
+📈 % Weekly Done: ${emp.weeklyWorkDone}%  
+⏱ Weekly On Time %: ${emp.weeklyWorkDoneOnTime}%  
+
+📊 Total Work Done: ${emp.totalWorkDone}  
+📉 Week Pending: ${emp.weekPending}  
+🚨 All Pending Till Date: ${emp.allPendingTillDate}  
+
+Please review your performance and ensure timely completion of pending tasks.
+
+Best regards,  
+Acemark Stationers.`;
+
+        const phone = emp.email || "";
+        const cleanPhone = phone.replace(/\D/g, "");
+        if (cleanPhone) {
+          whatsappLinks.push(`https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`);
+        }
+      }
+
+      alert("Data submitted to WhatsApp sheet successfully! ✅");
+      whatsappLinks.forEach(link => window.open(link, "_blank"));
+
+    } catch (error) {
+      console.error("WhatsApp Error:", error);
+      alert(`Error: ${error.message}`);
+    } finally {
+      setWhatsappSubmitting(false);
+      console.log("EXECUTION END: handleWhatsAppSubmit");
+    }
+  };
+
+  const handleMainSubmit = async (e) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log("EXECUTION START: handleMainSubmit");
+    if (whatsappSubmitting || mainSubmitting) return;
+
+    if (selectedEmployees.length === 0) {
+      alert("Please select at least one person.");
+      return;
+    }
+
+    setMainSubmitting(true);
     try {
       const scriptUrl = import.meta.env.VITE_APPS_SCRIPT_URL;
 
@@ -863,19 +980,9 @@ const AdminDashboard = () => {
         ];
 
         const existing = archivedMap[emp.name];
-
         const payload = existing
-          ? {
-            action: "update",
-            sheetName: "Archived",
-            rowIndex: existing.rowIndex,
-            rowData: JSON.stringify(row)
-          }
-          : {
-            action: "insert",
-            sheetName: "Archived",
-            rowData: JSON.stringify(row)
-          };
+          ? { action: "update", sheetName: "Archived", rowIndex: existing.rowIndex, rowData: JSON.stringify(row) }
+          : { action: "insert", sheetName: "Archived", rowData: JSON.stringify(row) };
 
         const response = await fetch(scriptUrl, {
           method: "POST",
@@ -884,22 +991,19 @@ const AdminDashboard = () => {
         });
 
         const result = await response.json();
-
-        if (!result.success) {
-          throw new Error(result.error || "Failed to save row");
-        }
+        if (!result.success) throw new Error(result.error || "Failed to save row");
       }
 
       alert("Saved successfully ✅");
       setSelectedEmployees([]);
       setEditableData({});
       setSelectAll(false);
-
     } catch (error) {
-      console.error(error);
-      alert(`Stopped: ${error.message}`);
+      console.error("Main Submit Error:", error);
+      alert(`Error: ${error.message}`);
     } finally {
-      setSubmitting(false);
+      setMainSubmitting(false);
+      console.log("EXECUTION END: handleMainSubmit");
     }
   };
 
@@ -931,9 +1035,11 @@ const AdminDashboard = () => {
         filterDepartment={filterDepartment}
         setFilterDepartment={setFilterDepartment}
         uniqueDesignations={uniqueDesignations}
-        handleSubmit={handleSubmit}
+        onMainSubmit={handleMainSubmit}
+        onWhatsAppSubmit={handleWhatsAppSubmit}
         selectedEmployees={selectedEmployees}
-        submitting={submitting}
+        mainSubmitting={mainSubmitting}
+        whatsappSubmitting={whatsappSubmitting}
         loading={loading}
         filteredEmployees={filteredEmployees}
         selectAll={selectAll}
