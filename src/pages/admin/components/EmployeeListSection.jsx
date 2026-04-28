@@ -508,13 +508,13 @@ const EmployeeListSection = ({
                                             <div className="flex justify-between">
                                                 <span className="text-gray-500">Target:</span>
                                                 <span className="font-semibold">
-                                                    {employee.target}%
+                                                    {employee.target}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
                                                 <span className="text-gray-500">Actual:</span>
                                                 <span className="font-semibold">
-                                                    {employee.actualWorkDone}%
+                                                    {employee.actualWorkDone}
                                                 </span>
                                             </div>
                                             <div className="flex justify-between">
