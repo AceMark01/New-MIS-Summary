@@ -1202,11 +1202,11 @@ Acemark Stationers.`;
             Department Scores
           </h2>
           <div className="h-[400px] md:h-[500px]">
-            <DepartmentScoreChart
-              labels={departmentScoresLabels}
-              pendingData={departmentScoresPending}
-              notDoneData={departmentScoresData}
-              notDoneOnTimeData={departmentScoresNotDoneOnTime}
+            <iframe
+              src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTO2wI31pXL9u9z_BmFSXomz2KWYoGRq687oTZL-PqltVhtQzqMVWTwtrfen7UbtitCDzNwRla0sWDZ/pubchart?oid=1932717403&format=interactive"
+              className="w-full h-full border-0 rounded-xl"
+              title="Department Score Chart"
+              allowFullScreen
             />
           </div>
         </div>
