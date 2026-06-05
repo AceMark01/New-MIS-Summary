@@ -77,7 +77,15 @@ export const generateDashboardPDF = async (visibleColumnsList, filteredEmployees
     
     <!-- Department Performance Section -->
     <div style="margin-bottom: 30px; background-color: white;">
-      <h2 style="font-size: 20px; font-weight: bold; color: #374151; margin: 0 0 15px 0;">Department Performance</h2>
+      <h2 style="font-size: 20px; font-weight: bold; color: #374151; margin: 0 0 15px 0;">Department Scores</h2>
+      <div style="margin-bottom: 20px; text-align: center;">
+        <img
+          src="https://docs.google.com/spreadsheets/d/e/2PACX-1vTO2wI31pXL9u9z_BmFSXomz2KWYoGRq687oTZL-PqltVhtQzqMVWTwtrfen7UbtitCDzNwRla0sWDZ/pubchart?oid=1932717403&format=image"
+          style="width: 100%; max-height: 400px; object-fit: contain; border-radius: 8px; border: 1px solid #e5e7eb;"
+          alt="Department Score Chart"
+          crossorigin="anonymous"
+        />
+      </div>
       <table style="width: 100%; border-collapse: collapse; font-size: 13px; border: 1px solid #e5e7eb;">
         <thead>
           <tr style="background-color: #f8fafc; border-bottom: 2px solid #e2e8f0;">
